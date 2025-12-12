@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import io from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
 import Board from './Board';
+import TradeModal from './TradeModal';
 import './Room.css';
 
 const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '/';
@@ -15,6 +16,7 @@ function Room() {
   const [myUuid, setMyUuid] = useState(localStorage.getItem('player_uuid'));
   const [needsNick, setNeedsNick] = useState(false);
   const [nickInput, setNickInput] = useState('');
+  const [showTradeModal, setShowTradeModal] = useState(false);
 
   const connectedRef = useRef(false);
   const logsEndRef = useRef(null);
@@ -94,6 +96,30 @@ function Room() {
 
   if (!gameState || !boardConfig.length) return <div>Ładowanie planszy... (Może serwer nie wstał?)</div>;
 
+  const me = gameState.players[myUuid];
+
+  if (gameState.status === 'waiting') {
+    const isHost = gameState.turn_order[0] === myUuid;
+    return (
+      <div className="lobby-screen">
+        <h1>POCZEKALNIA: {roomId}</h1>
+        <h3>Gracze:</h3>
+        <ul>
+          {gameState.turn_order.map(uid => (
+             <li key={uid}>{gameState.players[uid].nick}</li>
+          ))}
+        </ul>
+        {isHost ? (
+           <button className="btn-start" onClick={() => socket.emit('start_game', { roomId, uuid: myUuid })}>
+             START GRY
+           </button>
+        ) : (
+           <p>Czekamy na Hosta...</p>
+        )}
+      </div>
+    );
+  }
+
   if (gameState.winner) {
     return (
       <div className="winner-screen">
@@ -105,8 +131,6 @@ function Room() {
     );
   }
 
-  const me = gameState.players[myUuid];
-  // If me is undefined (e.g. kicked/bankrupt), show spectator mode or game over for me
   if (!me) {
      return (
        <div className="game-over">
@@ -142,6 +166,16 @@ function Room() {
      socket.emit('unmortgage_property', { roomId, uuid: myUuid, fieldId });
   };
 
+  const sendTrade = (tradeData) => {
+    socket.emit('propose_trade', {
+       roomId,
+       uuid: myUuid,
+       ...tradeData
+    });
+  };
+
+  const incomingTrade = gameState.trades.find(t => t.to === myUuid);
+
   const currentField = boardConfig.find(f => f.id === me?.pos);
   const canBuy = isMyTurn && currentField &&
     ['property', 'transport', 'utility'].includes(currentField.type) &&
@@ -155,6 +189,7 @@ function Room() {
           <h3>Twój portfel</h3>
           <div className="cash">{me?.cash || 0} CBL</div>
           <div className="nick">{me?.nick}</div>
+          <button className="btn-tiny trade-btn" onClick={() => setShowTradeModal(true)}>Handel</button>
         </div>
 
         {/* Property Management List */}
@@ -218,6 +253,41 @@ function Room() {
           ownership={gameState.board_ownership}
         />
       </div>
+
+      {showTradeModal && (
+        <TradeModal
+           me={me}
+           players={Object.values(gameState.players)}
+           boardConfig={boardConfig}
+           onClose={() => setShowTradeModal(false)}
+           onSend={sendTrade}
+        />
+      )}
+
+      {incomingTrade && (
+        <div className="modal-overlay">
+           <div className="modal trade-offer">
+              <h3>Otrzymałeś Ofertę Handlową</h3>
+              <p>Od: {gameState.players[incomingTrade.from].nick}</p>
+              <div className="offer-details">
+                 <div className="side">
+                   <strong>Dostajesz:</strong>
+                   <div>Kasa: {incomingTrade.offer.cash}</div>
+                   {incomingTrade.offer.properties.map(fid => <div key={fid}>{boardConfig.find(f => f.id === fid).name}</div>)}
+                 </div>
+                 <div className="side">
+                   <strong>Oddajesz:</strong>
+                   <div>Kasa: {incomingTrade.want.cash}</div>
+                   {incomingTrade.want.properties.map(fid => <div key={fid}>{boardConfig.find(f => f.id === fid).name}</div>)}
+                 </div>
+              </div>
+              <div className="trade-actions">
+                 <button className="btn-tiny warn" onClick={() => socket.emit('reject_trade', { roomId, uuid: myUuid, tradeId: incomingTrade.id })}>Odrzuć</button>
+                 <button className="btn-tiny success" onClick={() => socket.emit('accept_trade', { roomId, uuid: myUuid, tradeId: incomingTrade.id })}>Akceptuj</button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

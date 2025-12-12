@@ -1,0 +1,62 @@
+.trade-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.trade-modal {
+  background: white;
+  padding: 20px;
+  width: 800px;
+  max-width: 95vw;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  color: #333;
+}
+
+.trade-header select {
+  padding: 10px;
+  font-size: 1.2rem;
+  margin-left: 10px;
+}
+
+.trade-body {
+  display: flex;
+  gap: 20px;
+}
+
+.trade-side {
+  flex: 1;
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.prop-item {
+  padding: 5px;
+  margin: 2px 0;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  background: white;
+}
+
+.prop-item.selected {
+  background: #4caf50;
+  color: white;
+  border-color: #388e3c;
+}
+
+.trade-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-cancel { background: #9e9e9e; }
+.btn-confirm { background: #2196f3; }

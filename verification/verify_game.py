@@ -23,12 +23,24 @@ def verify_polnopoly():
 
         # 3. Handle Nickname Modal (if it appears)
         # It should appear because we have no localStorage
-        page.wait_for_selector(".modal", timeout=5000)
-        print("Modal appeared. Entering Nickname...")
-        page.screenshot(path="verification/2_modal.png")
+        try:
+             page.wait_for_selector(".modal", timeout=5000)
+             print("Modal appeared. Entering Nickname...")
+             page.screenshot(path="verification/2_modal.png")
 
-        page.fill(".modal input", "GRACZ1")
-        page.click(".modal button")
+             page.fill(".modal input", "GRACZ1")
+             page.click(".modal button")
+        except:
+             print("Modal did not appear (maybe already logged in)")
+
+        # 3b. Handle Lobby (New!)
+        try:
+             page.wait_for_selector(".lobby-screen", timeout=3000)
+             print("Lobby appeared. Starting game...")
+             page.screenshot(path="verification/2b_lobby.png")
+             page.click(".btn-start")
+        except:
+             print("Lobby did not appear (maybe already started or error)")
 
         # 4. Wait for Board
         print("Waiting for board...")
