@@ -58,7 +58,8 @@ io.on('connection', (socket) => {
         logs: [],
         winner: null,
         status: 'waiting', // waiting | playing
-        trades: [] // { id, from: uuid, to: uuid, offer: {cash, properties:[]}, want: {cash, properties:[]} }
+        trades: [], // { id, from: uuid, to: uuid, offer: {cash, properties:[]}, want: {cash, properties:[]} }
+        last_action: null // { type: 'roll', dice: [d1, d2], player: uuid, id: uuid }
       };
       console.log(`Created room ${roomId}`);
     }
@@ -135,6 +136,9 @@ io.on('connection', (socket) => {
       const die1 = Math.floor(Math.random() * 6) + 1;
       const die2 = Math.floor(Math.random() * 6) + 1;
 
+      // Store action
+      room.last_action = { type: 'roll', dice: [die1, die2], player: uuid, id: uuidv4() };
+
       if (die1 === die2) {
         player.inJail = false;
         player.turnsInJail = 0;
@@ -152,7 +156,6 @@ io.on('connection', (socket) => {
           movePlayer(room, player, die1 + die2, die1 + die2);
         } else {
           room.logs.push({ text: `${player.nick} siedzi dalej (${die1}-${die2}).`, type: 'info' });
-          // Must end turn manually
         }
       }
       io.to(roomId).emit('room_update', room);
@@ -165,6 +168,8 @@ io.on('connection', (socket) => {
     const move = die1 + die2;
     const isDouble = die1 === die2;
 
+    room.last_action = { type: 'roll', dice: [die1, die2], player: uuid, id: uuidv4() };
+
     if (isDouble) {
       player.consecutiveDoubles++;
       if (player.consecutiveDoubles >= 3) {
@@ -172,11 +177,7 @@ io.on('connection', (socket) => {
          sendToJail(room, player);
          player.consecutiveDoubles = 0;
          io.to(roomId).emit('room_update', room);
-         // Auto end turn logic implies passing turn, but we wait for user to click "End Turn" usually.
-         // But if sent to jail, turn ends immediately?
-         // For simplicity, let's let them click End Turn, but their turn is effectively over.
-         // Or force end turn?
-         socket.emit('force_end_turn'); // Not implemented on client, keep simple.
+         socket.emit('force_end_turn');
          return;
       }
       room.logs.push({ text: `${player.nick} wyrzucił dublet ${die1}-${die2}! Rzuca jeszcze raz.`, type: 'success' });
@@ -220,12 +221,6 @@ io.on('connection', (socket) => {
     if (!room) return;
 
     const player = room.players[uuid];
-
-    // Check if player rolled double and is not in jail?
-    // If double, they shouldn't end turn, they should roll again.
-    // Client should handle disabling "End Turn" button if double.
-    // But if they force it, we allow passing? No, rules say must roll.
-    // Simplifying: If they click end turn, they forfeit the double turn.
 
     if (room.turn_order[room.current_turn_index] !== uuid) return;
 
@@ -315,16 +310,13 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    // Validate assets
-    // ... Simplified validation: trust client for now or check quickly
-
     const tradeId = uuidv4();
     room.trades.push({
       id: tradeId,
       from: uuid,
       to: targetUuid,
-      offer, // { cash: 100, properties: [1, 2] }
-      want   // { cash: 0, properties: [5] }
+      offer,
+      want
     });
 
     const target = room.players[targetUuid];
@@ -341,13 +333,11 @@ io.on('connection', (socket) => {
     if (tradeIndex === -1) return;
     const trade = room.trades[tradeIndex];
 
-    if (trade.to !== uuid) return; // Only receiver can accept
+    if (trade.to !== uuid) return;
 
     const sender = room.players[trade.from];
     const receiver = room.players[trade.to];
 
-    // Execute Trade
-    // 1. Check Cash
     if (sender.cash < trade.offer.cash || receiver.cash < trade.want.cash) {
        room.logs.push({ text: `Handel nieudany - brak środków.`, type: 'danger' });
        room.trades.splice(tradeIndex, 1);
@@ -355,15 +345,11 @@ io.on('connection', (socket) => {
        return;
     }
 
-    // 2. Transfer Cash
     sender.cash -= trade.offer.cash;
     receiver.cash += trade.offer.cash;
 
     receiver.cash -= trade.want.cash;
     sender.cash += trade.want.cash;
-
-    // 3. Transfer Properties
-    // Check ownership
 
     trade.offer.properties.forEach(fid => {
        if (room.board_ownership[fid].owner === trade.from) {
@@ -428,7 +414,6 @@ function movePlayer(room, player, steps, diceRoll) {
 }
 
 function handleFieldArrival(room, player, field, diceRoll) {
-  // 1. Rent
   if (['property', 'transport', 'utility'].includes(field.type)) {
     const prop = room.board_ownership[field.id];
     if (prop && prop.owner && prop.owner !== player.uuid) {
@@ -438,12 +423,9 @@ function handleFieldArrival(room, player, field, diceRoll) {
       }
 
       const owner = room.players[prop.owner];
-
       let rent = field.rent || 0;
 
-      // Advanced Rent Calculation
       if (field.type === 'transport') {
-        // Find how many transports owner has
         const ownerTransports = room.players[prop.owner].properties
            .map(id => boardConfig.find(f => f.id === id))
            .filter(f => f.type === 'transport')
@@ -459,7 +441,6 @@ function handleFieldArrival(room, player, field, diceRoll) {
          const multiplier = ownerUtilities === 2 ? 10 : 4;
          rent = diceRoll * multiplier;
       } else {
-        // Regular property house logic
         if (prop.houses > 0) {
           rent = rent * Math.pow(2, prop.houses);
         }
@@ -478,18 +459,15 @@ function handleFieldArrival(room, player, field, diceRoll) {
     }
   }
 
-  // 2. Taxes
   if (field.type === 'tax') {
     player.cash -= field.amount;
     room.logs.push({ text: `Nowy Ład! ${player.nick} traci ${field.amount} CBL.`, type: 'danger' });
   }
 
-  // 3. Go To Jail
   if (field.type === 'gotojail') {
     sendToJail(room, player);
   }
 
-  // 4. Chance
   if (field.type === 'chance') {
     handleChanceCard(room, player);
   }
@@ -521,8 +499,6 @@ function handleChanceCard(room, player) {
       break;
     case 'move_to':
       player.pos = card.target;
-      // Should handle arrival at target (recursion risk handled by not passing dice roll or using defaults)
-      // For simplified, just move.
       break;
     case 'collect_all':
       const amount = card.amount;
@@ -550,7 +526,6 @@ function handleBankruptcy(room, bankruptUuid) {
     room.current_turn_index = room.current_turn_index % room.turn_order.length;
   }
 
-  // Check Winner
   if (room.turn_order.length === 1) {
     const winnerUuid = room.turn_order[0];
     const winner = room.players[winnerUuid];
@@ -559,7 +534,6 @@ function handleBankruptcy(room, bankruptUuid) {
   }
 }
 
-// Handle React Routing, return all requests to React app
 app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });

@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import io from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
+import confetti from 'canvas-confetti';
 import Board from './Board';
 import TradeModal from './TradeModal';
+import Dice from './Dice';
 import './Room.css';
 
 const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '/';
@@ -17,9 +19,11 @@ function Room() {
   const [needsNick, setNeedsNick] = useState(false);
   const [nickInput, setNickInput] = useState('');
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [rollingDice, setRollingDice] = useState(null); // { die1, die2 } or null
 
   const connectedRef = useRef(false);
   const logsEndRef = useRef(null);
+  const lastActionIdRef = useRef(null);
 
   useEffect(() => {
     if (connectedRef.current) return;
@@ -46,6 +50,32 @@ function Room() {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [gameState?.logs]);
+
+  // Handle Animations based on state updates
+  useEffect(() => {
+    if (!gameState) return;
+
+    // Dice Animation
+    if (gameState.last_action && gameState.last_action.type === 'roll') {
+      if (gameState.last_action.id !== lastActionIdRef.current) {
+         lastActionIdRef.current = gameState.last_action.id;
+         setRollingDice({
+            die1: gameState.last_action.dice[0],
+            die2: gameState.last_action.dice[1]
+         });
+      }
+    }
+
+    // Winner Confetti
+    if (gameState.winner) {
+      confetti({
+         particleCount: 150,
+         spread: 70,
+         origin: { y: 0.6 }
+      });
+    }
+
+  }, [gameState]);
 
   const initSocket = (uuid, nick = null) => {
     const newSocket = io(SOCKET_URL);
@@ -184,6 +214,14 @@ function Room() {
 
   return (
     <div className="room-container">
+      {rollingDice && (
+        <Dice
+          die1={rollingDice.die1}
+          die2={rollingDice.die2}
+          onComplete={() => setRollingDice(null)}
+        />
+      )}
+
       <div className="sidebar">
         <div className="player-stats">
           <h3>Twój portfel</h3>
