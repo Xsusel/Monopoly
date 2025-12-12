@@ -1,0 +1,312 @@
+[
+  {
+    "id": 0,
+    "name": "MOPS / 500+",
+    "type": "start",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 1,
+    "name": "Sosnowiec",
+    "type": "property",
+    "price": 60,
+    "rent": 2,
+    "group": "brown"
+  },
+  {
+    "id": 2,
+    "name": "Los Polacos",
+    "type": "chance",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 3,
+    "name": "Radom",
+    "type": "property",
+    "price": 60,
+    "rent": 4,
+    "group": "brown"
+  },
+  {
+    "id": 4,
+    "name": "Nowy Ład",
+    "type": "tax",
+    "price": 0,
+    "amount": 200,
+    "group": "special"
+  },
+  {
+    "id": 5,
+    "name": "PKP Intercity",
+    "type": "transport",
+    "price": 200,
+    "rent": 25,
+    "group": "transport"
+  },
+  {
+    "id": 6,
+    "name": "Działka ROD Radość",
+    "type": "property",
+    "price": 100,
+    "rent": 6,
+    "group": "lightblue"
+  },
+  {
+    "id": 7,
+    "name": "Los Polacos",
+    "type": "chance",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 8,
+    "name": "Działka ROD Spokój",
+    "type": "property",
+    "price": 100,
+    "rent": 6,
+    "group": "lightblue"
+  },
+  {
+    "id": 9,
+    "name": "Działka ROD Relaks",
+    "type": "property",
+    "price": 120,
+    "rent": 8,
+    "group": "lightblue"
+  },
+  {
+    "id": 10,
+    "name": "Izba Wytrzeźwień",
+    "type": "jail_visit",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 11,
+    "name": "Mielno",
+    "type": "property",
+    "price": 140,
+    "rent": 10,
+    "group": "pink"
+  },
+  {
+    "id": 12,
+    "name": "Orlen (Parówki)",
+    "type": "utility",
+    "price": 150,
+    "rent": 0,
+    "group": "utility"
+  },
+  {
+    "id": 13,
+    "name": "Władysławowo",
+    "type": "property",
+    "price": 140,
+    "rent": 10,
+    "group": "pink"
+  },
+  {
+    "id": 14,
+    "name": "Zakopane",
+    "type": "property",
+    "price": 160,
+    "rent": 12,
+    "group": "pink"
+  },
+  {
+    "id": 15,
+    "name": "Passat 1.9 TDI",
+    "type": "transport",
+    "price": 200,
+    "rent": 25,
+    "group": "transport"
+  },
+  {
+    "id": 16,
+    "name": "Bieszczady",
+    "type": "property",
+    "price": 180,
+    "rent": 14,
+    "group": "orange"
+  },
+  {
+    "id": 17,
+    "name": "Los Polacos",
+    "type": "chance",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 18,
+    "name": "Mazury",
+    "type": "property",
+    "price": 180,
+    "rent": 14,
+    "group": "orange"
+  },
+  {
+    "id": 19,
+    "name": "Sopot",
+    "type": "property",
+    "price": 200,
+    "rent": 16,
+    "group": "orange"
+  },
+  {
+    "id": 20,
+    "name": "Darmowy Parking pod Biedrą",
+    "type": "parking",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 21,
+    "name": "Łódź Bałuty",
+    "type": "property",
+    "price": 220,
+    "rent": 18,
+    "group": "red"
+  },
+  {
+    "id": 22,
+    "name": "Los Polacos",
+    "type": "chance",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 23,
+    "name": "Wrocław Trójkąt",
+    "type": "property",
+    "price": 220,
+    "rent": 18,
+    "group": "red"
+  },
+  {
+    "id": 24,
+    "name": "Kraków Nowa Huta",
+    "type": "property",
+    "price": 240,
+    "rent": 20,
+    "group": "red"
+  },
+  {
+    "id": 25,
+    "name": "Hulajnoga Elektryczna",
+    "type": "transport",
+    "price": 200,
+    "rent": 25,
+    "group": "transport"
+  },
+  {
+    "id": 26,
+    "name": "Patodeweloperka 1",
+    "type": "property",
+    "price": 260,
+    "rent": 22,
+    "group": "yellow"
+  },
+  {
+    "id": 27,
+    "name": "Mikrokawalerka 9m2",
+    "type": "property",
+    "price": 260,
+    "rent": 22,
+    "group": "yellow"
+  },
+  {
+    "id": 28,
+    "name": "Żabka (Hot Dogi)",
+    "type": "utility",
+    "price": 150,
+    "rent": 0,
+    "group": "utility"
+  },
+  {
+    "id": 29,
+    "name": "Dziura w Ziemi",
+    "type": "property",
+    "price": 280,
+    "rent": 24,
+    "group": "yellow"
+  },
+  {
+    "id": 30,
+    "name": "Bagiety po Ciebie jadą",
+    "type": "gotojail",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 31,
+    "name": "Wilanów",
+    "type": "property",
+    "price": 300,
+    "rent": 26,
+    "group": "green"
+  },
+  {
+    "id": 32,
+    "name": "Nowogrodzka",
+    "type": "property",
+    "price": 300,
+    "rent": 26,
+    "group": "green"
+  },
+  {
+    "id": 33,
+    "name": "Los Polacos",
+    "type": "chance",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 34,
+    "name": "Apartament Złota 44",
+    "type": "property",
+    "price": 320,
+    "rent": 28,
+    "group": "green"
+  },
+  {
+    "id": 35,
+    "name": "Uber / Bolt",
+    "type": "transport",
+    "price": 200,
+    "rent": 25,
+    "group": "transport"
+  },
+  {
+    "id": 36,
+    "name": "Los Polacos",
+    "type": "chance",
+    "price": 0,
+    "group": "special"
+  },
+  {
+    "id": 37,
+    "name": "Siedziba TVP",
+    "type": "property",
+    "price": 350,
+    "rent": 35,
+    "group": "darkblue"
+  },
+  {
+    "id": 38,
+    "name": "Podatek Cukrowy",
+    "type": "tax",
+    "price": 0,
+    "amount": 100,
+    "group": "special"
+  },
+  {
+    "id": 39,
+    "name": "Żoliborz",
+    "type": "property",
+    "price": 400,
+    "rent": 50,
+    "group": "darkblue"
+  }
+]
