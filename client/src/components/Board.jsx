@@ -38,48 +38,6 @@ function Board({ config, players, ownership }) {
   // Let's create an array of 11x11 = 121 cells.
   // Map field IDs to grid coordinates.
 
-  const renderCell = (fieldId) => {
-    const field = config.find(f => f.id === fieldId);
-    if (!field) return null;
-
-    const ownerUuid = ownership[fieldId];
-    // Find owner color if any
-    let ownerColor = null;
-    if (ownerUuid) {
-      const owner = players.find(p => p.uuid === ownerUuid);
-      if (owner) ownerColor = owner.color;
-    }
-
-    const fieldPlayers = players.filter(p => p.pos === fieldId);
-
-    return (
-      <div
-        key={fieldId}
-        className={`board-cell type-${field.type}`}
-        style={{ backgroundColor: GROUP_COLORS[field.group] }}
-      >
-        <div className="field-header" style={{ backgroundColor: field.group !== 'special' ? GROUP_COLORS[field.group] : 'transparent' }}>
-          {ownerColor && <div className="owner-indicator" style={{ backgroundColor: ownerColor }}></div>}
-        </div>
-        <div className="field-name">{field.name}</div>
-        {field.price > 0 && <div className="field-price">{field.price}</div>}
-
-        <div className="players-container">
-           {fieldPlayers.map(p => (
-             <div
-               key={p.uuid}
-               className="player-token"
-               style={{ backgroundColor: p.color }}
-               title={p.nick}
-             >
-               {p.nick[0]}
-             </div>
-           ))}
-        </div>
-      </div>
-    );
-  };
-
   // 11x11 Grid
   // Row 1 (Top): 20 -> 30
   // Row 11 (Bottom): 10 -> 0
@@ -126,8 +84,9 @@ function Board({ config, players, ownership }) {
           <div className="name">{f.name}</div>
 
           {ownership[f.id] && (
-            <div className="owner-marker" style={{ backgroundColor: players.find(p => p.uuid === ownership[f.id])?.color || 'black' }}>
-              WŁASNOŚĆ
+            <div className="owner-marker" style={{ backgroundColor: players.find(p => p.uuid === ownership[f.id].owner)?.color || 'black' }}>
+               {ownership[f.id].houses > 0 && <span className="houses">{'🏠'.repeat(ownership[f.id].houses)}</span>}
+               {ownership[f.id].mortgaged && <span className="mortgaged">ZASTAW</span>}
             </div>
           )}
 

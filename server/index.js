@@ -31,13 +31,15 @@ try {
 }
 
 // In-memory state
-// Structure: { roomId: { players: { uuid: { ... } }, board_ownership: {}, turn_order: [], current_turn_index: 0, logs: [] } }
+// Structure: { roomId: { players: { uuid: { ... } }, board_ownership: { fieldId: { owner: uuid, houses: 0, mortgaged: false } }, turn_order: [], current_turn_index: 0, logs: [] } }
 const rooms = {};
 
 const STARTING_CASH = 1500;
 const PASS_START_BONUS = 200;
 const JAIL_POSITION = 10;
 const BAIL_PRICE = 50;
+const HOUSE_PRICE = 100; // Simplified for now, or fetch from config if added
+const MORTGAGE_INTEREST = 0.1;
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -51,10 +53,11 @@ io.on('connection', (socket) => {
       rooms[roomId] = {
         id: roomId,
         players: {},
-        board_ownership: {}, // field_id -> player_uuid
+        board_ownership: {}, // field_id -> { owner: uuid, houses: 0, mortgaged: false }
         turn_order: [],
         current_turn_index: 0,
-        logs: []
+        logs: [],
+        winner: null
       };
       console.log(`Created room ${roomId}`);
     }
@@ -104,6 +107,8 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room) return;
 
+    if (room.winner) return;
+
     // Validate turn
     const currentPlayerUuid = room.turn_order[room.current_turn_index];
     if (currentPlayerUuid !== uuid) return;
@@ -112,13 +117,6 @@ io.on('connection', (socket) => {
 
     // Jail Logic
     if (player.inJail) {
-      // Simplified: Try to roll doubles (implied) or pay.
-      // For now, let's say they try to roll doubles automatically.
-      // If fails, they stay, unless it's 3rd turn then pay.
-      // Or we can add a "pay bail" button later.
-      // Let's implement: Roll dice. If double -> Free + Move. Else -> Stay.
-      // Simplified Prompt Version: Just roll.
-
       const die1 = Math.floor(Math.random() * 6) + 1;
       const die2 = Math.floor(Math.random() * 6) + 1;
 
@@ -137,10 +135,6 @@ io.on('connection', (socket) => {
           movePlayer(room, player, die1 + die2);
         } else {
           room.logs.push({ text: `${player.nick} siedzi dalej (${die1}-${die2}).`, type: 'info' });
-          // End turn happens via explicit call or auto? Prompt says "Gracz klika Rzuć".
-          // Usually after failed roll in jail, turn ends immediately.
-          // But our frontend expects "End Turn" click probably?
-          // Let's leave it to user to click End Turn.
         }
       }
 
@@ -167,11 +161,16 @@ io.on('connection', (socket) => {
     const field = boardConfig.find(f => f.id === fieldId);
 
     if (field.type !== 'property' && field.type !== 'transport' && field.type !== 'utility') return;
-    if (room.board_ownership[fieldId]) return;
-    if (player.cash < field.price) return;
+    if (room.board_ownership[fieldId]) return; // Already owned
+    if (player.cash < field.price) return; // Too poor
 
+    // Execute buy
     player.cash -= field.price;
-    room.board_ownership[fieldId] = uuid;
+    room.board_ownership[fieldId] = {
+      owner: uuid,
+      houses: 0,
+      mortgaged: false
+    };
     player.properties.push(fieldId);
 
     room.logs.push({ text: `${player.nick} kupuje ${field.name} za ${field.price} CBL.`, type: 'success' });
@@ -185,7 +184,6 @@ io.on('connection', (socket) => {
 
     if (room.turn_order[room.current_turn_index] !== uuid) return;
 
-    // Check bankruptcy at end of turn (or whenever cash changes, but here is safe)
     if (room.players[uuid].cash < 0) {
       handleBankruptcy(room, uuid);
     } else {
@@ -194,6 +192,83 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit('room_update', room);
   });
+
+  // --- NEW HANDLERS ---
+
+  socket.on('build_house', ({ roomId, uuid, fieldId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const player = room.players[uuid];
+    const prop = room.board_ownership[fieldId];
+    const field = boardConfig.find(f => f.id === fieldId);
+
+    // Validations
+    if (!prop || prop.owner !== uuid) return;
+    if (field.type !== 'property') return;
+    if (prop.mortgaged) return; // Cannot build on mortgaged
+    if (prop.houses >= 5) return; // Max 5 (Hotel)
+    if (player.cash < HOUSE_PRICE) return;
+
+    // Check Group Ownership
+    const groupFields = boardConfig.filter(f => f.group === field.group);
+    const ownsAll = groupFields.every(f => {
+      const p = room.board_ownership[f.id];
+      return p && p.owner === uuid && !p.mortgaged; // Must own all and not be mortgaged? Standard rules say yes.
+    });
+
+    if (!ownsAll) return;
+
+    // Build
+    player.cash -= HOUSE_PRICE;
+    prop.houses += 1;
+
+    const typeName = prop.houses === 5 ? 'Hotel' : 'Domek';
+    room.logs.push({ text: `${player.nick} stawia ${typeName} na ${field.name}.`, type: 'success' });
+
+    io.to(roomId).emit('room_update', room);
+  });
+
+  socket.on('mortgage_property', ({ roomId, uuid, fieldId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const player = room.players[uuid];
+    const prop = room.board_ownership[fieldId];
+    const field = boardConfig.find(f => f.id === fieldId);
+
+    if (!prop || prop.owner !== uuid) return;
+    if (prop.mortgaged) return;
+    if (prop.houses > 0) return; // Must sell houses first (simplified: just block)
+
+    const mortgageValue = Math.floor(field.price / 2);
+    player.cash += mortgageValue;
+    prop.mortgaged = true;
+
+    room.logs.push({ text: `${player.nick} zastawia ${field.name} za ${mortgageValue} CBL.`, type: 'warning' });
+    io.to(roomId).emit('room_update', room);
+  });
+
+  socket.on('unmortgage_property', ({ roomId, uuid, fieldId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const player = room.players[uuid];
+    const prop = room.board_ownership[fieldId];
+    const field = boardConfig.find(f => f.id === fieldId);
+
+    if (!prop || prop.owner !== uuid) return;
+    if (!prop.mortgaged) return;
+
+    const mortgageValue = Math.floor(field.price / 2);
+    const cost = Math.floor(mortgageValue * (1 + MORTGAGE_INTEREST));
+
+    if (player.cash < cost) return;
+
+    player.cash -= cost;
+    prop.mortgaged = false;
+
+    room.logs.push({ text: `${player.nick} wykupuje ${field.name} z zastawu za ${cost} CBL.`, type: 'success' });
+    io.to(roomId).emit('room_update', room);
+  });
+
 });
 
 function movePlayer(room, player, steps) {
@@ -217,21 +292,36 @@ function movePlayer(room, player, steps) {
 function handleFieldArrival(room, player, field) {
   // 1. Rent
   if (['property', 'transport', 'utility'].includes(field.type)) {
-    const ownerUuid = room.board_ownership[field.id];
-    if (ownerUuid && ownerUuid !== player.uuid) {
-      const owner = room.players[ownerUuid];
+    const prop = room.board_ownership[field.id];
+    if (prop && prop.owner && prop.owner !== player.uuid) {
+      if (prop.mortgaged) {
+         room.logs.push({ text: `${player.nick} staje na ${field.name}, ale jest zastawione. Uff!`, type: 'info' });
+         return;
+      }
+
+      const owner = room.players[prop.owner];
+
+      // Rent Calculation
       let rent = field.rent || 0;
 
-      // Multipliers could be added here
+      // House Multiplier (Simplified)
+      // 1 house = 5x base rent? Or just +? Standard is massive jump.
+      // Let's use simple logic: rent * (1 + houses) * houses?
+      // Standard: Base, x5, x15, x45, x80, x100 (roughly).
+      // Let's do: rent * (2 ^ houses) roughly.
+      if (prop.houses > 0) {
+        rent = rent * Math.pow(2, prop.houses);
+      }
+
+      // Transport logic? (Not implemented deep yet, stick to base rent for now)
 
       if (player.cash >= rent) {
         player.cash -= rent;
         owner.cash += rent;
         room.logs.push({ text: `${player.nick} płaci ${rent} CBL złodziejowi ${owner.nick}.`, type: 'danger' });
       } else {
-        // Partial payment / Debt
         const amount = player.cash > 0 ? player.cash : 0;
-        player.cash -= rent; // Go negative
+        player.cash -= rent;
         owner.cash += amount;
         room.logs.push({ text: `${player.nick} wisi kasę! Płaci co ma (${amount}) i jest na minusie.`, type: 'danger' });
       }
@@ -280,12 +370,8 @@ function handleChanceCard(room, player) {
       break;
     case 'move_to':
       player.pos = card.target;
-      // Handle arrival at new pos?
-      // Usually yes, but recursive risk. Simple implementation: Just move.
-      // Or call handleFieldArrival(room, player, boardConfig[card.target])
       break;
     case 'collect_all':
-      // From all other players
       const amount = card.amount;
       Object.values(room.players).forEach(p => {
         if (p.uuid !== player.uuid) {
@@ -301,22 +387,22 @@ function handleBankruptcy(room, bankruptUuid) {
   const player = room.players[bankruptUuid];
   room.logs.push({ text: `KOMORNIK ZAJĄŁ MEBLOŚCIANKĘ! ${player.nick} BANKRUTUJE I ODPADA!`, type: 'danger' });
 
-  // Return properties to bank (clear ownership)
   player.properties.forEach(fieldId => {
     delete room.board_ownership[fieldId];
   });
 
-  // Remove player from turn order
   room.turn_order = room.turn_order.filter(uid => uid !== bankruptUuid);
 
-  // Clean up player object? Or keep for history?
-  // Keeping it might crash rendering if we assume they exist in turn order.
-  // Better to just mark as bankrupt state if we want to show them.
-  // For now, removing from turn order prevents them from playing.
-
-  // Adjust current turn index
   if (room.turn_order.length > 0) {
     room.current_turn_index = room.current_turn_index % room.turn_order.length;
+  }
+
+  // Check Winner
+  if (room.turn_order.length === 1) {
+    const winnerUuid = room.turn_order[0];
+    const winner = room.players[winnerUuid];
+    room.winner = winner;
+    room.logs.push({ text: `MAMY ZWYCIĘZCĘ! KRÓL CEBULI: ${winner.nick}!`, type: 'success' });
   }
 }
 

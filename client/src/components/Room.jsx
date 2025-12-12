@@ -17,6 +17,7 @@ function Room() {
   const [nickInput, setNickInput] = useState('');
 
   const connectedRef = useRef(false);
+  const logsEndRef = useRef(null);
 
   useEffect(() => {
     if (connectedRef.current) return;
@@ -36,6 +37,13 @@ function Room() {
       if (socket) socket.disconnect();
     };
   }, []);
+
+  // Auto-scroll logs
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [gameState?.logs]);
 
   const initSocket = (uuid, nick = null) => {
     const newSocket = io(SOCKET_URL);
@@ -86,7 +94,28 @@ function Room() {
 
   if (!gameState || !boardConfig.length) return <div>Ładowanie planszy... (Może serwer nie wstał?)</div>;
 
+  if (gameState.winner) {
+    return (
+      <div className="winner-screen">
+        <h1>KONIEC GRY!</h1>
+        <h2>KRÓL CEBULI: {gameState.winner.nick}</h2>
+        <p>Gratulacje! Zniszczyłeś konkurencję.</p>
+        <button onClick={() => window.location.reload()}>Nowa Gra</button>
+      </div>
+    );
+  }
+
   const me = gameState.players[myUuid];
+  // If me is undefined (e.g. kicked/bankrupt), show spectator mode or game over for me
+  if (!me) {
+     return (
+       <div className="game-over">
+          <h1>BANKRUCTWO</h1>
+          <p>Odpadasz z gry. Możesz oglądać.</p>
+       </div>
+     );
+  }
+
   const isMyTurn = gameState.turn_order[gameState.current_turn_index] === myUuid;
 
   const handleRoll = () => {
@@ -99,6 +128,18 @@ function Room() {
 
   const handleEndTurn = () => {
     socket.emit('end_turn', { roomId, uuid: myUuid });
+  };
+
+  const handleBuild = (fieldId) => {
+     socket.emit('build_house', { roomId, uuid: myUuid, fieldId });
+  };
+
+  const handleMortgage = (fieldId) => {
+     socket.emit('mortgage_property', { roomId, uuid: myUuid, fieldId });
+  };
+
+  const handleUnmortgage = (fieldId) => {
+     socket.emit('unmortgage_property', { roomId, uuid: myUuid, fieldId });
   };
 
   const currentField = boardConfig.find(f => f.id === me?.pos);
@@ -116,10 +157,39 @@ function Room() {
           <div className="nick">{me?.nick}</div>
         </div>
 
+        {/* Property Management List */}
+        <div className="properties-list">
+          <h4>Twoje Włości:</h4>
+          {me.properties.length === 0 && <p className="empty">Brak nieruchomości</p>}
+          {me.properties.map(fid => {
+             const field = boardConfig.find(f => f.id === fid);
+             const prop = gameState.board_ownership[fid];
+             return (
+               <div key={fid} className="prop-item" style={{ borderLeft: `5px solid ${field.group}` }}>
+                 <div className="prop-name">{field.name}</div>
+                 <div className="prop-status">
+                   {prop.mortgaged ? 'ZASTAWIONE' : (prop.houses > 0 ? `Domki: ${prop.houses}` : '')}
+                 </div>
+                 <div className="prop-actions">
+                   {!prop.mortgaged && field.type === 'property' && (
+                     <button className="btn-tiny" onClick={() => handleBuild(fid)} title="Buduj">+</button>
+                   )}
+                   {!prop.mortgaged ? (
+                     <button className="btn-tiny warn" onClick={() => handleMortgage(fid)} title="Zastaw">Z</button>
+                   ) : (
+                     <button className="btn-tiny success" onClick={() => handleUnmortgage(fid)} title="Wykup">W</button>
+                   )}
+                 </div>
+               </div>
+             );
+          })}
+        </div>
+
         <div className="logs">
-           {gameState.logs.slice().reverse().map((log, i) => (
+           {gameState.logs.map((log, i) => (
              <div key={i} className={`log-entry ${log.type}`}>{log.text}</div>
            ))}
+           <div ref={logsEndRef} />
         </div>
 
         <div className="controls">
