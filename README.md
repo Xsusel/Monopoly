@@ -48,3 +48,34 @@ Multiplayerowa gra ekonomiczna w czasie rzeczywistym z silnym naciskiem na polsk
 
 ## Konfiguracja
 Plik konfiguracyjny planszy znajduje się w `server/data/board.json`. Możesz tam zmieniać nazwy miast, ceny i czynsze.
+
+## Aktualizacja na Serwerze
+
+Aby zaktualizować grę po wprowadzeniu zmian w kodzie:
+
+1. Zaloguj się na serwer i wejdź do folderu projektu:
+   ```bash
+   cd /sciezka/do/projektu
+   ```
+
+2. Pobierz zmiany z repozytorium:
+   ```bash
+   git pull origin main
+   ```
+
+3. Przebuduj frontend (jeśli były zmiany w `client`):
+   ```bash
+   cd client
+   npm install  # Opcjonalnie, jeśli doszły biblioteki
+   npm run build
+   cd ..
+   ```
+
+4. Zrestartuj serwer backendu (używając PM2):
+   ```bash
+   cd server
+   npm install # Opcjonalnie, jeśli doszły biblioteki
+   pm2 restart polnopoly
+   ```
+
+5. Gotowe! Odśwież stronę w przeglądarce.

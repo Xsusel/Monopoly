@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Board from './Board';
 import './Room.css';
 
-const SOCKET_URL = 'http://localhost:3000'; // Or generic / if proxied
+const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '/';
 
 function Room() {
   const { roomId } = useParams();

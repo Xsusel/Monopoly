@@ -1,0 +1,61 @@
+[
+  {
+    "id": 1,
+    "text": "Sąsiad doniósł, że palisz śmieciami w piecu. Płacisz 50 mandatu.",
+    "action": "pay",
+    "amount": 50
+  },
+  {
+    "id": 2,
+    "text": "Znalazłeś 4-pak Żubra na promocji. Wygrywasz 20 cebulionów.",
+    "action": "gain",
+    "amount": 20
+  },
+  {
+    "id": 3,
+    "text": "Twoja córka studiuje prawo. Wszyscy gracze składają się po 10, żebyś przestał o tym gadać.",
+    "action": "collect_all",
+    "amount": 10
+  },
+  {
+    "id": 4,
+    "text": "Inflacja wywaliła w kosmos. Płacisz 40 za każdy dom i 115 za hotel (uproszczone: Płacisz 100).",
+    "action": "pay",
+    "amount": 100
+  },
+  {
+    "id": 5,
+    "text": "Wygrałeś przetarg na maseczki od instruktora narciarstwa. Pobierasz 500.",
+    "action": "gain",
+    "amount": 500
+  },
+  {
+    "id": 6,
+    "text": "Ukradłeś rowerek miejski. Idziesz prosto na Izbę Wytrzeźwień.",
+    "action": "goto_jail"
+  },
+  {
+    "id": 7,
+    "text": "Dostałeś zwrot podatku. Pobierz 100 CBL.",
+    "action": "gain",
+    "amount": 100
+  },
+  {
+    "id": 8,
+    "text": "Przekroczyłeś prędkość w terenie zabudowanym. Płacisz 150 CBL.",
+    "action": "pay",
+    "amount": 150
+  },
+  {
+    "id": 9,
+    "text": "Idź na Pole Start. Pobierz 200 CBL.",
+    "action": "move_to",
+    "target": 0
+  },
+  {
+    "id": 10,
+    "text": "Remontujesz łazienkę. Płacisz 100 CBL za kafelki.",
+    "action": "pay",
+    "amount": 100
+  }
+]
