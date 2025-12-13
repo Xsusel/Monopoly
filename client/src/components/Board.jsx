@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import './Board.css';
+import './Markers.css';
 
 // Groups colors
 const GROUP_COLORS = {
@@ -23,38 +24,48 @@ const GROUP_COLORS = {
 };
 
 function Board({ config, players, ownership }) {
-  // We need to order fields correctly for CSS Grid 11x11
-  // Standard Monopoly is 40 fields.
-  // 0 is Bottom Right.
-  // 1-9 Bottom (Right to Left)
-  // 10 Bottom Left (Jail)
-  // 11-19 Left (Bottom to Top)
-  // 20 Top Left (Parking)
-  // 21-29 Top (Left to Right)
-  // 30 Top Right (GoToJail)
-  // 31-39 Right (Top to Bottom)
+  // State for animated positions
+  const [renderedPositions, setRenderedPositions] = useState({});
+  const animationRefs = useRef({});
 
-  // This is tricky in CSS Grid.
-  // Let's create an array of 11x11 = 121 cells.
-  // Map field IDs to grid coordinates.
+  // Initialize or Sync
+  useEffect(() => {
+    // Check for changes
+    players.forEach(p => {
+      const target = p.pos;
+      const current = renderedPositions[p.uuid] !== undefined ? renderedPositions[p.uuid] : target;
 
-  // 11x11 Grid
-  // Row 1 (Top): 20 -> 30
-  // Row 11 (Bottom): 10 -> 0
-  // Col 1 (Left): 20 -> 10
-  // Col 11 (Right): 30 -> 0
+      if (current !== target) {
+        // Needs animation
+        if (animationRefs.current[p.uuid]) return; // Already animating
 
-  // We can just iterate 0..40 and place them via grid-area logic or raw styles.
-  // Or easier: Just map them to a linear list and use specific grid-column/row props.
+        // Simple step animation
+        animationRefs.current[p.uuid] = setInterval(() => {
+           setRenderedPositions(prev => {
+              const curr = prev[p.uuid] !== undefined ? prev[p.uuid] : target;
+              if (curr === target) {
+                 clearInterval(animationRefs.current[p.uuid]);
+                 delete animationRefs.current[p.uuid];
+                 return prev;
+              }
 
-  // 0 (Start): Row 11, Col 11
-  // 1-9: Row 11, Col 10..2
-  // 10 (Jail): Row 11, Col 1
-  // 11-19: Row 10..2, Col 1
-  // 20 (Parking): Row 1, Col 1
-  // 21-29: Row 1, Col 2..10
-  // 30 (GoToJail): Row 1, Col 11
-  // 31-39: Row 2..10, Col 11
+              let next = curr + 1;
+              if (next >= 40) next = 0;
+
+              // If we wrapped and target is behind, it's fine.
+              // Logic: move 1 step.
+
+              return { ...prev, [p.uuid]: next };
+           });
+        }, 200); // 200ms per step
+      } else {
+         // Sync instant (initial load)
+         if (renderedPositions[p.uuid] === undefined) {
+            setRenderedPositions(prev => ({ ...prev, [p.uuid]: target }));
+         }
+      }
+    });
+  }, [players]);
 
   const getGridStyle = (id) => {
     if (id === 0) return { gridRow: 11, gridColumn: 11 };
@@ -117,21 +128,35 @@ function Board({ config, players, ownership }) {
           )}
 
           {f.price > 0 && <div className="price-tag">{f.price}</div>}
+
+          <div className="cell-icon">{f.icon}</div>
+
           <div className="name">{f.name}</div>
 
           {ownership[f.id] && (
-            <div className="owner-marker" style={{ backgroundColor: players.find(p => p.uuid === ownership[f.id].owner)?.color || 'black' }}>
-               {ownership[f.id].houses > 0 && <span className="houses">{'🏠'.repeat(ownership[f.id].houses)}</span>}
-               {ownership[f.id].mortgaged && <span className="mortgaged">ZASTAW</span>}
-            </div>
+            <>
+              <div className="owner-marker" style={{ backgroundColor: players.find(p => p.uuid === ownership[f.id].owner)?.color || 'black' }}></div>
+              {ownership[f.id].houses > 0 && !ownership[f.id].mortgaged && (
+                 <div className="houses-container">
+                    {ownership[f.id].houses === 5 ? (
+                       <div className="hotel-marker" title="Hotel"></div>
+                    ) : (
+                       Array.from({ length: ownership[f.id].houses }).map((_, i) => <div key={i} className="house-marker"></div>)
+                    )}
+                 </div>
+              )}
+              {ownership[f.id].mortgaged && <span className="mortgaged">ZASTAW</span>}
+              {/* Full border highlight for owner? */}
+              <div className="owner-indicator" style={{ borderColor: players.find(p => p.uuid === ownership[f.id].owner)?.color || 'transparent', opacity: 0.5 }}></div>
+            </>
           )}
 
           <div className="tokens">
-            {players.filter(p => p.pos === f.id).map(p => (
+            {players.filter(p => (renderedPositions[p.uuid] !== undefined ? renderedPositions[p.uuid] : p.pos) === f.id).map(p => (
               <div
                  key={p.uuid}
                  className="token"
-                 style={{ backgroundColor: p.color }}
+                 style={{ backgroundColor: p.color, transition: 'all 0.2s ease' }}
                  title={p.nick}
               >
                 {p.avatar || p.nick.substring(0,2)}

@@ -1,61 +1,121 @@
 [
   {
     "id": 1,
-    "text": "Mandat za parkowanie. Płacisz 50 PLN.",
+    "text": "Sąsiad doniósł, że nie segregujesz śmieci. Płacisz 50 PLN.",
     "action": "pay",
     "amount": 50
   },
   {
     "id": 2,
-    "text": "Bank pomylił się na Twoją korzyść. Wygrywasz 20 PLN.",
+    "text": "Znalazłeś 4-pak na promocji. Wygrywasz 20 PLN.",
     "action": "gain",
     "amount": 20
   },
   {
     "id": 3,
-    "text": "Masz urodziny. Wszyscy gracze składają się po 10 PLN na prezent dla Ciebie.",
+    "text": "Masz Imieniny. Każdy gracz zrzuca się po 10 PLN na prezent.",
     "action": "collect_all",
     "amount": 10
   },
   {
     "id": 4,
-    "text": "Przeprowadzasz remont generalny. Płacisz 40 za każdy dom i 115 za hotel (uproszczone: Płacisz 100).",
+    "text": "Inflacja uderzyła. Płacisz 40 za każdy dom i 115 za hotel (uproszczone: Płacisz 100).",
     "action": "pay",
     "amount": 100
   },
   {
     "id": 5,
-    "text": "Dostałeś spadek. Pobierasz 500 PLN.",
+    "text": "Dostałeś dotację z Unii. Pobierasz 500 PLN.",
     "action": "gain",
     "amount": 500
   },
   {
     "id": 6,
-    "text": "Idziesz prosto do Więzienia. Nie przechodzisz przez START.",
+    "text": "Ukradłeś rowerek miejski. Idziesz prosto do Sztumu.",
     "action": "goto_jail"
   },
   {
     "id": 7,
-    "text": "Zwrot podatku dochodowego. Pobierz 100 PLN.",
+    "text": "Zwrot podatku. Urząd Skarbowy się pomylił. Pobierz 100 PLN.",
     "action": "gain",
     "amount": 100
   },
   {
     "id": 8,
-    "text": "Mandat za przekroczenie prędkości. Płacisz 150 PLN.",
+    "text": "Fotoradar. Płacisz 150 PLN.",
     "action": "pay",
     "amount": 150
   },
   {
     "id": 9,
-    "text": "Idź na Pole START. Pobierz 200 PLN.",
+    "text": "Wracasz na START po zasiłek. Pobierz 200 PLN.",
     "action": "move_to",
     "target": 0
   },
   {
     "id": 10,
-    "text": "Opłaty szpitalne. Płacisz 100 PLN.",
+    "text": "Kupiłeś kurs 'Jak zostać milionerem'. Płacisz 100 PLN.",
     "action": "pay",
     "amount": 100
+  },
+  {
+    "id": 11,
+    "text": "Oddałeś butelki w automacie. Otrzymujesz 15 PLN.",
+    "action": "gain",
+    "amount": 15
+  },
+  {
+    "id": 12,
+    "text": "Awaria Czajki. Składka na naprawę. Płacisz 50 PLN.",
+    "action": "pay",
+    "amount": 50
+  },
+  {
+    "id": 13,
+    "text": "Wygrana w zdrapce. Pobierz 100 PLN.",
+    "action": "gain",
+    "amount": 100
+  },
+  {
+    "id": 14,
+    "text": "Zgubiłeś portfel w Mielnie. Tracisz 100 PLN.",
+    "action": "pay",
+    "amount": 100
+  },
+  {
+    "id": 15,
+    "text": "Twoja krypto 'CebulaCoin' wystrzeliła. Pobierz 200 PLN.",
+    "action": "gain",
+    "amount": 200
+  },
+  {
+    "id": 16,
+    "text": "Remont sąsiada. Musisz się wyprowadzić do hotelu na weekend. Płacisz 150 PLN.",
+    "action": "pay",
+    "amount": 150
+  },
+  {
+    "id": 17,
+    "text": "Promocja w Biedrze na świeżaki. Tłum cię stratował. Szpital kosztuje 50 PLN.",
+    "action": "pay",
+    "amount": 50
+  },
+  {
+    "id": 18,
+    "text": "Sprzedałeś Passata. Pobierz 300 PLN.",
+    "action": "gain",
+    "amount": 300
+  },
+  {
+    "id": 19,
+    "text": "Komornik zajął ci telewizor. Płacisz 200 PLN.",
+    "action": "pay",
+    "amount": 200
+  },
+  {
+    "id": 20,
+    "text": "Idź na Dworzec Centralny (5). Jeśli przejdziesz przez START, pobierz 200 PLN.",
+    "action": "move_to",
+    "target": 5
   }
 ]

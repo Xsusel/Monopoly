@@ -30,6 +30,14 @@ try {
   console.log("No chance cards found or error loading.");
 }
 
+// Load community chest cards
+let communityChestCards = [];
+try {
+  communityChestCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'community_chest.json'), 'utf8'));
+} catch (e) {
+  console.log("No community chest cards found or error loading.");
+}
+
 // In-memory state
 const rooms = {};
 
@@ -560,7 +568,11 @@ function handleFieldArrival(room, player, field, diceRoll) {
   }
 
   if (field.type === 'chance') {
-    handleChanceCard(room, player);
+    handleChanceCard(room, player, chanceCards, "Szansa");
+  }
+
+  if (field.type === 'community_chest') {
+    handleChanceCard(room, player, communityChestCards, "Skrzynia");
   }
 }
 
@@ -572,11 +584,11 @@ function sendToJail(room, player) {
   room.logs.push({ text: `${player.nick} idzie do Więzienia!`, type: 'warning' });
 }
 
-function handleChanceCard(room, player) {
-  if (chanceCards.length === 0) return;
-  const card = chanceCards[Math.floor(Math.random() * chanceCards.length)];
+function handleChanceCard(room, player, deck, deckName) {
+  if (!deck || deck.length === 0) return;
+  const card = deck[Math.floor(Math.random() * deck.length)];
 
-  room.logs.push({ text: `Karta Szansy: ${card.text}`, type: 'special' });
+  room.logs.push({ text: `${deckName}: ${card.text}`, type: 'special' });
 
   switch(card.action) {
     case 'pay':
