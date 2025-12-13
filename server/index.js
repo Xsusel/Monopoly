@@ -60,7 +60,9 @@ io.on('connection', (socket) => {
         status: 'waiting', // waiting | playing
         trades: [], // { id, from: uuid, to: uuid, offer: {cash, properties:[]}, want: {cash, properties:[]} }
         last_action: null, // { type: 'roll', dice: [d1, d2], player: uuid, id: uuid }
-        chat_messages: [] // { nick, text, time }
+        chat_messages: [], // { nick, text, time }
+        settings: { turnDuration: 0 }, // 0 = unlimited
+        turnDeadline: null
       };
       console.log(`Created room ${roomId}`);
     }
@@ -174,20 +176,32 @@ io.on('connection', (socket) => {
      if (room.turn_order[0] !== uuid) return;
      if (room.status !== 'playing') return;
 
-     room.current_turn_index = (room.current_turn_index + 1) % room.turn_order.length;
+     nextTurn(room);
      room.logs.push({ text: `HOST wymusił koniec tury.`, type: 'warning' });
      io.to(roomId).emit('room_update', room);
   });
 
-  socket.on('start_game', ({ roomId, uuid }) => {
+  socket.on('start_game', ({ roomId, uuid, settings }) => {
     const room = rooms[roomId];
     if (!room) return;
 
     // Only first player (host) can start
     if (room.turn_order[0] !== uuid) return;
 
+    if (settings) {
+       room.settings = settings;
+    }
+
     room.status = 'playing';
-    room.logs.push({ text: `GRA ROZPOCZĘTA!`, type: 'success' });
+    room.current_turn_index = 0;
+
+    if (room.settings.turnDuration > 0) {
+       room.turnDeadline = Date.now() + (room.settings.turnDuration * 1000);
+    } else {
+       room.turnDeadline = null;
+    }
+
+    room.logs.push({ text: `GRA ROZPOCZĘTA! Czas na turę: ${room.settings.turnDuration > 0 ? room.settings.turnDuration + 's' : 'Bez limitu'}.`, type: 'success' });
     io.to(roomId).emit('room_update', room);
   });
 
@@ -300,7 +314,7 @@ io.on('connection', (socket) => {
     if (player.cash < 0) {
       handleBankruptcy(room, uuid);
     } else {
-      room.current_turn_index = (room.current_turn_index + 1) % room.turn_order.length;
+      nextTurn(room);
     }
 
     io.to(roomId).emit('room_update', room);
@@ -585,6 +599,15 @@ function handleChanceCard(room, player) {
   }
 }
 
+function nextTurn(room) {
+  room.current_turn_index = (room.current_turn_index + 1) % room.turn_order.length;
+  if (room.settings.turnDuration > 0) {
+     room.turnDeadline = Date.now() + (room.settings.turnDuration * 1000);
+  } else {
+     room.turnDeadline = null;
+  }
+}
+
 function handleBankruptcy(room, bankruptUuid) {
   const player = room.players[bankruptUuid];
   room.logs.push({ text: `${player.nick} BANKRUTUJE I ODPADA!`, type: 'danger' });
@@ -599,13 +622,37 @@ function handleBankruptcy(room, bankruptUuid) {
     room.current_turn_index = room.current_turn_index % room.turn_order.length;
   }
 
+  // Check win condition
   if (room.turn_order.length === 1) {
     const winnerUuid = room.turn_order[0];
     const winner = room.players[winnerUuid];
     room.winner = winner;
     room.logs.push({ text: `MAMY ZWYCIĘZCĘ: ${winner.nick}!`, type: 'success' });
+    room.status = 'finished';
+  } else {
+     // Reset timer for next player if game continues
+     if (room.settings.turnDuration > 0) {
+        room.turnDeadline = Date.now() + (room.settings.turnDuration * 1000);
+     }
   }
 }
+
+// Global Interval for Game Loop (Timers)
+setInterval(() => {
+  const now = Date.now();
+  for (const roomId in rooms) {
+    const room = rooms[roomId];
+    if (room.status === 'playing' && room.turnDeadline && now > room.turnDeadline) {
+       // Time expired!
+       const currentPlayerUuid = room.turn_order[room.current_turn_index];
+       const player = room.players[currentPlayerUuid];
+
+       room.logs.push({ text: `Czas minął! Tura gracza ${player.nick} przepadła.`, type: 'warning' });
+       nextTurn(room);
+       io.to(roomId).emit('room_update', room);
+    }
+  }
+}, 1000);
 
 app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));

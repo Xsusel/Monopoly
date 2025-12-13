@@ -24,6 +24,8 @@ function Room() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false); // Default to logs, toggle to Chat
+  const [turnDuration, setTurnDuration] = useState(60); // Default 60s
+  const [timeLeft, setTimeLeft] = useState(null);
 
   const connectedRef = useRef(false);
   const logsEndRef = useRef(null);
@@ -93,6 +95,21 @@ function Room() {
     }
 
   }, [gameState]);
+
+  // Timer Countdown Effect
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'playing' || !gameState.turnDeadline) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((gameState.turnDeadline - Date.now()) / 1000);
+      setTimeLeft(remaining > 0 ? remaining : 0);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState?.turnDeadline, gameState?.status]);
 
   const initSocket = (uuid, nick = null) => {
     const newSocket = io(SOCKET_URL);
@@ -206,9 +223,22 @@ function Room() {
           })}
         </ul>
         {isHost ? (
-           <button className="btn-start" onClick={() => socket.emit('start_game', { roomId, uuid: myUuid })}>
-             START GRY
-           </button>
+           <div className="host-controls">
+             <div className="setting-row">
+                <label>Czas na turę: </label>
+                <select value={turnDuration} onChange={e => setTurnDuration(Number(e.target.value))}>
+                  <option value={0}>Bez limitu</option>
+                  <option value={30}>30 sek</option>
+                  <option value={60}>60 sek</option>
+                  <option value={90}>90 sek</option>
+                  <option value={120}>2 min</option>
+                  <option value={300}>5 min</option>
+                </select>
+             </div>
+             <button className="btn-start" onClick={() => socket.emit('start_game', { roomId, uuid: myUuid, settings: { turnDuration } })}>
+               START GRY
+             </button>
+           </div>
         ) : (
            <p>Czekamy na Hosta...</p>
         )}
@@ -295,6 +325,13 @@ function Room() {
              Twój portfel
              {isHost && <button className="btn-tiny warn" onClick={forceSkip} title="Wymuś koniec tury (AFK)" style={{ fontSize: '10px', padding: '2px 4px' }}>SKIP</button>}
           </h3>
+
+          {timeLeft !== null && (
+            <div className={`turn-timer ${timeLeft <= 10 ? 'danger' : ''}`} style={{ fontSize: '1.2rem', fontWeight: 'bold', color: timeLeft <= 10 ? 'red' : 'white', marginBottom: '10px' }}>
+               ⏳ {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </div>
+          )}
+
           <div className="cash">{me?.cash || 0} PLN</div>
           <div className="nick" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
              <span className="status-dot online" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4caf50' }}></span>
