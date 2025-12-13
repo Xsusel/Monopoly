@@ -68,6 +68,14 @@ function Board({ config, players, ownership }) {
     return {};
   };
 
+  const getRent = (field, houses) => {
+      let rent = field.rent || 0;
+      if (houses > 0) {
+        rent = rent * Math.pow(2, houses);
+      }
+      return rent;
+  };
+
   return (
     <div className="board-grid">
       <div className="center-logo">
@@ -77,9 +85,37 @@ function Board({ config, players, ownership }) {
       {config.map(f => (
         <div
           key={f.id}
-          className={`board-cell cell-${f.id}`}
+          className={`board-cell cell-${f.id} ${['property', 'transport', 'utility'].includes(f.type) ? 'interactive' : ''}`}
           style={{ ...getGridStyle(f.id), backgroundColor: GROUP_COLORS[f.group] }}
         >
+          {/* Title Deed Tooltip */}
+          {['property', 'transport', 'utility'].includes(f.type) && (
+             <div className="deed-card">
+                <div className="deed-header" style={{ backgroundColor: GROUP_COLORS[f.group] }}>
+                  {f.name}
+                </div>
+                <div className="deed-body">
+                   <div className="deed-row"><strong>Cena:</strong> {f.price} PLN</div>
+                   {f.type === 'property' && (
+                     <>
+                       <div className="deed-row">Czynsz: {f.rent}</div>
+                       <div className="deed-row">1 Dom: {getRent(f, 1)}</div>
+                       <div className="deed-row">2 Domy: {getRent(f, 2)}</div>
+                       <div className="deed-row">3 Domy: {getRent(f, 3)}</div>
+                       <div className="deed-row">4 Domy: {getRent(f, 4)}</div>
+                       <div className="deed-row">Hotel: {getRent(f, 5)}</div>
+                       <div className="deed-row">Koszt Domu: 100 PLN</div>
+                     </>
+                   )}
+                   {f.type === 'transport' && <div className="deed-info">Czynsz zależy od liczby posiadanych dworców.</div>}
+                   {f.type === 'utility' && <div className="deed-info">Czynsz zależy od rzutu kostką.</div>}
+                   <div className="deed-row" style={{ marginTop: '5px', borderTop: '1px solid #ccc' }}>
+                      Zastaw: {Math.floor(f.price / 2)}
+                   </div>
+                </div>
+             </div>
+          )}
+
           {f.price > 0 && <div className="price-tag">{f.price}</div>}
           <div className="name">{f.name}</div>
 
@@ -98,7 +134,7 @@ function Board({ config, players, ownership }) {
                  style={{ backgroundColor: p.color }}
                  title={p.nick}
               >
-                {p.nick.substring(0,2)}
+                {p.avatar || p.nick.substring(0,2)}
               </div>
             ))}
           </div>

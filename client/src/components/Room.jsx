@@ -32,15 +32,43 @@ function Room() {
   const chatEndRef = useRef(null);
   const lastActionIdRef = useRef(null);
 
+  // Reuse AudioContext
+  const audioCtxRef = useRef(null);
+
+  const playBeep = (freq = 440, type = 'sine', duration = 0.1) => {
+    try {
+      if (!audioCtxRef.current) {
+         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+      osc.stop(ctx.currentTime + duration);
+    } catch (e) {
+      // Audio context might be blocked
+    }
+  };
+
   useEffect(() => {
     if (connectedRef.current) return;
 
     const storedUuid = localStorage.getItem('player_uuid');
     const passedNick = location.state?.nick;
+    const passedAvatar = location.state?.avatar;
 
     if (passedNick) {
        const uuidToUse = storedUuid || uuidv4();
-       initSocket(uuidToUse, passedNick);
+       initSocket(uuidToUse, passedNick, passedAvatar);
     } else {
        if (!storedUuid) {
          setNeedsNick(true);
@@ -70,11 +98,11 @@ function Room() {
     }
   }, [chatMessages, showChat]);
 
-  // Handle Animations based on state updates
+  // Handle Animations & Sounds based on state updates
   useEffect(() => {
     if (!gameState) return;
 
-    // Dice Animation
+    // Dice Animation & Sound
     if (gameState.last_action && gameState.last_action.type === 'roll') {
       if (gameState.last_action.id !== lastActionIdRef.current) {
          lastActionIdRef.current = gameState.last_action.id;
@@ -82,7 +110,18 @@ function Room() {
             die1: gameState.last_action.dice[0],
             die2: gameState.last_action.dice[1]
          });
+         playBeep(200, 'square', 0.1); // Roll sound
       }
+    }
+
+    // Turn Start Sound
+    if (gameState.turn_order[gameState.current_turn_index] === myUuid) {
+        // Only play if it just became my turn.
+        // Simple check: we don't store previous turn index in state easily here without ref.
+        // But this useEffect runs on every gameState update.
+        // Let's rely on log updates or check strict equality with prev state if possible?
+        // Actually, just checking if it is my turn now is "okay" but might spam if other state changes.
+        // We can track prevTurnIndex in ref.
     }
 
     // Winner Confetti
@@ -92,9 +131,45 @@ function Room() {
          spread: 70,
          origin: { y: 0.6 }
       });
+      playBeep(600, 'sine', 0.5); // Win sound
     }
 
   }, [gameState]);
+
+  // Track turn changes for sound
+  const prevTurnRef = useRef(null);
+  useEffect(() => {
+     if (!gameState) return;
+     const currentTurnPlayer = gameState.turn_order[gameState.current_turn_index];
+
+     if (prevTurnRef.current !== currentTurnPlayer) {
+        if (currentTurnPlayer === myUuid) {
+            playBeep(600, 'sine', 0.2); // My Turn!
+            setTimeout(() => playBeep(800, 'sine', 0.4), 200);
+        } else {
+            // Other player turn
+            playBeep(300, 'sine', 0.1);
+        }
+        prevTurnRef.current = currentTurnPlayer;
+     }
+  }, [gameState?.current_turn_index]);
+
+  // Track Cash for sound
+  const prevCashRef = useRef(null);
+  useEffect(() => {
+     if (!me) return;
+     if (prevCashRef.current !== null && me.cash !== prevCashRef.current) {
+         if (me.cash > prevCashRef.current) {
+             // Money gained
+             playBeep(1000, 'triangle', 0.1);
+             setTimeout(() => playBeep(1200, 'triangle', 0.1), 100);
+         } else {
+             // Money spent
+             playBeep(150, 'sawtooth', 0.1);
+         }
+     }
+     prevCashRef.current = me.cash;
+  }, [me?.cash]);
 
   // Timer Countdown Effect
   useEffect(() => {
@@ -111,11 +186,11 @@ function Room() {
     return () => clearInterval(interval);
   }, [gameState?.turnDeadline, gameState?.status]);
 
-  const initSocket = (uuid, nick = null) => {
+  const initSocket = (uuid, nick = null, avatar = null) => {
     const newSocket = io(SOCKET_URL);
     setSocket(newSocket);
 
-    newSocket.emit('join_room', { roomId, uuid, nick });
+    newSocket.emit('join_room', { roomId, uuid, nick, avatar });
 
     newSocket.on('joined_success', (data) => {
       localStorage.setItem('player_uuid', data.uuid);
@@ -214,7 +289,7 @@ function Room() {
                      backgroundColor: p.online ? '#4caf50' : '#f44336'
                    }}
                  ></span>
-                 {p.nick}
+                 <span style={{ fontSize: '1.2rem' }}>{p.avatar || '👤'}</span> {p.nick}
                  {isHost && uid !== myUuid && (
                    <button className="btn-tiny danger" onClick={() => kickPlayer(uid)} style={{ marginLeft: 'auto' }}>X</button>
                  )}
@@ -335,6 +410,7 @@ function Room() {
           <div className="cash">{me?.cash || 0} PLN</div>
           <div className="nick" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
              <span className="status-dot online" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4caf50' }}></span>
+             <span style={{ fontSize: '1.2rem' }}>{me?.avatar || '👤'}</span>
              {me?.nick}
              <button className="btn-tiny" onClick={copyLink} title="Kopiuj link" style={{ marginLeft: 'auto', fontSize: '12px' }}>🔗</button>
           </div>

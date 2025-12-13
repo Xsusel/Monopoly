@@ -43,7 +43,7 @@ const MORTGAGE_INTEREST = 0.1;
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join_room', ({ roomId, nick, uuid }) => {
+  socket.on('join_room', ({ roomId, nick, uuid, avatar }) => {
     // 1. Validate or create UUID
     const playerUuid = uuid || uuidv4();
 
@@ -77,6 +77,7 @@ io.on('connection', (socket) => {
       room.players[playerUuid] = {
         uuid: playerUuid,
         nick: nick || 'Anon',
+        avatar: avatar || '👤',
         cash: STARTING_CASH,
         pos: 0,
         properties: [],
@@ -96,6 +97,9 @@ io.on('connection', (socket) => {
       room.players[playerUuid].online = true;
       if (nick) {
         room.players[playerUuid].nick = nick; // Update nick if provided
+      }
+      if (avatar) {
+        room.players[playerUuid].avatar = avatar; // Update avatar if provided
       }
       console.log(`Player ${room.players[playerUuid].nick} reconnected.`);
     }
