@@ -9,14 +9,15 @@
 
 .sidebar {
   width: 320px;
-  background: #0f172a; /* Slate-900 */
+  background: rgba(15, 23, 42, 0.85); /* Glassmorphism base */
+  backdrop-filter: blur(12px);
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
   padding: 20px;
-  border-right: 1px solid #334155;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 10;
-  box-shadow: 4px 0 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
 }
 
 .board-area {
@@ -46,13 +47,14 @@
 }
 
 .player-stats {
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.7);
   padding: 15px;
-  border-radius: 12px;
+  border-radius: 16px;
   text-align: center;
   margin-bottom: 20px;
-  border: 1px solid #334155;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
 }
 
 .cash {
@@ -137,9 +139,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #1e293b;
-  border-radius: 8px;
-  border: 1px solid #334155;
+  background: rgba(30, 41, 59, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .logs {

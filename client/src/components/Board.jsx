@@ -23,7 +23,7 @@ const GROUP_COLORS = {
   chance: '#ffffff'
 };
 
-function Board({ config, players, ownership }) {
+function Board({ config, players, ownership, currentPlayerId }) {
   // State for animated positions
   const [renderedPositions, setRenderedPositions] = useState({});
   const animationRefs = useRef({});
@@ -155,7 +155,7 @@ function Board({ config, players, ownership }) {
             {players.filter(p => (renderedPositions[p.uuid] !== undefined ? renderedPositions[p.uuid] : p.pos) === f.id).map(p => (
               <div
                  key={p.uuid}
-                 className="token"
+                 className={`token ${p.uuid === currentPlayerId ? 'active-turn' : ''}`}
                  style={{ backgroundColor: p.color, transition: 'all 0.2s ease' }}
                  title={p.nick}
               >

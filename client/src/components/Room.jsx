@@ -510,6 +510,7 @@ function Room() {
           config={boardConfig}
           players={Object.values(gameState.players)}
           ownership={gameState.board_ownership}
+          currentPlayerId={gameState.turn_order[gameState.current_turn_index]}
         />
       </div>
 
