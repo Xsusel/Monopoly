@@ -89,6 +89,9 @@ io.on('connection', (socket) => {
     } else {
       // Reconnect
       room.players[playerUuid].socketId = socket.id;
+      if (nick) {
+        room.players[playerUuid].nick = nick; // Update nick if provided
+      }
       console.log(`Player ${room.players[playerUuid].nick} reconnected.`);
     }
 
@@ -143,7 +146,7 @@ io.on('connection', (socket) => {
         player.inJail = false;
         player.turnsInJail = 0;
         player.consecutiveDoubles = 0;
-        room.logs.push({ text: `${player.nick} wyrzuca dublet (${die1}-${die2}) i wychodzi z Izby Wytrzeźwień!`, type: 'success' });
+        room.logs.push({ text: `${player.nick} wyrzuca dublet (${die1}-${die2}) i wychodzi z Więzienia!`, type: 'success' });
         movePlayer(room, player, die1 + die2, die1 + die2);
       } else {
         player.turnsInJail++;
@@ -211,7 +214,7 @@ io.on('connection', (socket) => {
     };
     player.properties.push(fieldId);
 
-    room.logs.push({ text: `${player.nick} kupuje ${field.name} za ${field.price} CBL.`, type: 'success' });
+    room.logs.push({ text: `${player.nick} kupuje ${field.name} za ${field.price} PLN.`, type: 'success' });
 
     io.to(roomId).emit('room_update', room);
   });
@@ -278,7 +281,7 @@ io.on('connection', (socket) => {
     player.cash += mortgageValue;
     prop.mortgaged = true;
 
-    room.logs.push({ text: `${player.nick} zastawia ${field.name} za ${mortgageValue} CBL.`, type: 'warning' });
+    room.logs.push({ text: `${player.nick} zastawia ${field.name} za ${mortgageValue} PLN.`, type: 'warning' });
     io.to(roomId).emit('room_update', room);
   });
 
@@ -300,7 +303,7 @@ io.on('connection', (socket) => {
     player.cash -= cost;
     prop.mortgaged = false;
 
-    room.logs.push({ text: `${player.nick} wykupuje ${field.name} z zastawu za ${cost} CBL.`, type: 'success' });
+    room.logs.push({ text: `${player.nick} wykupuje ${field.name} z zastawu za ${cost} PLN.`, type: 'success' });
     io.to(roomId).emit('room_update', room);
   });
 
@@ -403,7 +406,7 @@ function movePlayer(room, player, steps, diceRoll) {
     if (newPos >= 40) {
       newPos = newPos - 40;
       player.cash += PASS_START_BONUS;
-      room.logs.push({ text: `MOPS wypłacił 500+ (${PASS_START_BONUS} CBL) dla gracza ${player.nick}.`, type: 'success' });
+      room.logs.push({ text: `Przechodzisz przez START. Otrzymujesz ${PASS_START_BONUS} PLN.`, type: 'success' });
     }
 
     player.pos = newPos;
@@ -449,19 +452,19 @@ function handleFieldArrival(room, player, field, diceRoll) {
       if (player.cash >= rent) {
         player.cash -= rent;
         owner.cash += rent;
-        room.logs.push({ text: `${player.nick} płaci ${rent} CBL złodziejowi ${owner.nick}.`, type: 'danger' });
+        room.logs.push({ text: `${player.nick} płaci czynsz ${rent} PLN dla gracza ${owner.nick}.`, type: 'danger' });
       } else {
         const amount = player.cash > 0 ? player.cash : 0;
         player.cash -= rent;
         owner.cash += amount;
-        room.logs.push({ text: `${player.nick} wisi kasę! Płaci co ma (${amount}) i jest na minusie.`, type: 'danger' });
+        room.logs.push({ text: `${player.nick} nie ma środków! Płaci co ma (${amount}) i jest na minusie.`, type: 'danger' });
       }
     }
   }
 
   if (field.type === 'tax') {
     player.cash -= field.amount;
-    room.logs.push({ text: `Nowy Ład! ${player.nick} traci ${field.amount} CBL.`, type: 'danger' });
+    room.logs.push({ text: `Podatek! ${player.nick} traci ${field.amount} PLN.`, type: 'danger' });
   }
 
   if (field.type === 'gotojail') {
@@ -478,7 +481,7 @@ function sendToJail(room, player) {
   player.inJail = true;
   player.turnsInJail = 0;
   player.consecutiveDoubles = 0;
-  room.logs.push({ text: `Bagiety po Ciebie jadą! ${player.nick} ląduje na Izbie Wytrzeźwień.`, type: 'warning' });
+  room.logs.push({ text: `${player.nick} idzie do Więzienia!`, type: 'warning' });
 }
 
 function handleChanceCard(room, player) {
@@ -514,7 +517,7 @@ function handleChanceCard(room, player) {
 
 function handleBankruptcy(room, bankruptUuid) {
   const player = room.players[bankruptUuid];
-  room.logs.push({ text: `KOMORNIK ZAJĄŁ MEBLOŚCIANKĘ! ${player.nick} BANKRUTUJE I ODPADA!`, type: 'danger' });
+  room.logs.push({ text: `${player.nick} BANKRUTUJE I ODPADA!`, type: 'danger' });
 
   player.properties.forEach(fieldId => {
     delete room.board_ownership[fieldId];
@@ -530,7 +533,7 @@ function handleBankruptcy(room, bankruptUuid) {
     const winnerUuid = room.turn_order[0];
     const winner = room.players[winnerUuid];
     room.winner = winner;
-    room.logs.push({ text: `MAMY ZWYCIĘZCĘ! KRÓL CEBULI: ${winner.nick}!`, type: 'success' });
+    room.logs.push({ text: `MAMY ZWYCIĘZCĘ: ${winner.nick}!`, type: 'success' });
   }
 }
 

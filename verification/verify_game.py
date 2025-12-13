@@ -1,68 +1,54 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
+import time
 
-def verify_polnopoly():
+def run():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        # Use a larger viewport to see the whole board
-        context = browser.new_context(viewport={'width': 1200, 'height': 1000})
-        page = context.new_page()
+        page = browser.new_page()
 
-        # 1. Navigate to Home
-        print("Navigating to home...")
+        # 1. Visit Home
         page.goto("http://localhost:3000")
-        page.wait_for_load_state("networkidle")
 
-        # Screenshot Home
-        page.screenshot(path="verification/1_home.png")
-        print("Screenshot 1: Home")
+        # Check title
+        expect(page.get_by_role("heading", name="POLNOPOLY")).to_be_visible()
+        expect(page.get_by_role("heading", name="GRA EKONOMICZNA")).to_be_visible()
 
-        # 2. Enter Room Name
-        print("Creating room 'TESTROOM'...")
-        page.fill("input[type='text']", "TESTROOM")
-        page.click("button[type='submit']")
+        # 2. Login
+        page.get_by_placeholder("Twój Nick").fill("GraczTestowy")
+        page.get_by_placeholder("Nazwa Pokoju (np. DOMOWKA)").fill("TESTROOM")
+        page.get_by_role("button", name="GRAJ").click()
 
-        # 3. Handle Nickname Modal (if it appears)
-        # It should appear because we have no localStorage
-        try:
-             page.wait_for_selector(".modal", timeout=5000)
-             print("Modal appeared. Entering Nickname...")
-             page.screenshot(path="verification/2_modal.png")
+        # 3. Wait for Room to load
+        expect(page.get_by_role("heading", name="POCZEKALNIA: TESTROOM")).to_be_visible()
 
-             page.fill(".modal input", "GRACZ1")
-             page.click(".modal button")
-        except:
-             print("Modal did not appear (maybe already logged in)")
+        # 4. Screenshot Lobby
+        page.screenshot(path="verification/lobby.png")
+        print("Lobby screenshot taken")
 
-        # 3b. Handle Lobby (New!)
-        try:
-             page.wait_for_selector(".lobby-screen", timeout=3000)
-             print("Lobby appeared. Starting game...")
-             page.screenshot(path="verification/2b_lobby.png")
-             page.click(".btn-start")
-        except:
-             print("Lobby did not appear (maybe already started or error)")
+        # 5. Start Game
+        page.get_by_role("button", name="START GRY").click()
 
-        # 4. Wait for Board
-        print("Waiting for board...")
-        page.wait_for_selector(".board-grid", timeout=10000)
+        # 6. Wait for Game Board
+        # The class is .board-grid based on Board.jsx
+        expect(page.locator(".board-grid")).to_be_visible(timeout=10000)
 
-        # 5. Interact (Roll Dice)
-        # Wait for "RZUĆ KOSTKĄ" button
-        try:
-            # It might not be my turn if logic fails, but I am the first player
-            page.wait_for_selector(".btn-roll", timeout=2000)
-            print("Rolling dice...")
-            page.click(".btn-roll")
-            # Wait a bit for update
-            page.wait_for_timeout(1000)
-        except:
-            print("Roll button not found (maybe not my turn or error?)")
+        # 7. Check Currency in UI
+        expect(page.locator(".cash")).to_contain_text("PLN")
 
-        # 6. Screenshot Board
-        print("Taking final screenshot...")
-        page.screenshot(path="verification/3_board.png")
+        # 8. Check Center Logo on Board
+        expect(page.locator(".center-logo p")).to_have_text("GRA EKONOMICZNA")
+
+        # 9. Check a Board Name (e.g. Białystok instead of Sosnowiec)
+        # Using xpath or text search in .name class
+        # .name is inside .board-cell
+        # Let's just search for text "Białystok"
+        expect(page.get_by_text("Białystok")).to_be_visible()
+        expect(page.get_by_text("Warszawa Centrum")).to_be_visible()
+
+        page.screenshot(path="verification/board.png")
+        print("Board screenshot taken")
 
         browser.close()
 
 if __name__ == "__main__":
-    verify_polnopoly()
+    run()

@@ -72,7 +72,7 @@ function Board({ config, players, ownership }) {
     <div className="board-grid">
       <div className="center-logo">
         <h1>POLNOPOLY</h1>
-        <p>EDYCJA CEBULA</p>
+        <p>GRA EKONOMICZNA</p>
       </div>
       {config.map(f => (
         <div

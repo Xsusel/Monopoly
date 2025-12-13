@@ -1,14 +1,14 @@
 [
   {
     "id": 0,
-    "name": "MOPS / 500+",
+    "name": "START",
     "type": "start",
     "price": 0,
     "group": "special"
   },
   {
     "id": 1,
-    "name": "Sosnowiec",
+    "name": "Białystok",
     "type": "property",
     "price": 60,
     "rent": 2,
@@ -16,14 +16,14 @@
   },
   {
     "id": 2,
-    "name": "Los Polacos",
+    "name": "Szansa",
     "type": "chance",
     "price": 0,
     "group": "special"
   },
   {
     "id": 3,
-    "name": "Radom",
+    "name": "Lublin",
     "type": "property",
     "price": 60,
     "rent": 4,
@@ -31,7 +31,7 @@
   },
   {
     "id": 4,
-    "name": "Nowy Ład",
+    "name": "Podatek Dochodowy",
     "type": "tax",
     "price": 0,
     "amount": 200,
@@ -39,7 +39,7 @@
   },
   {
     "id": 5,
-    "name": "PKP Intercity",
+    "name": "Dworzec Centralny",
     "type": "transport",
     "price": 200,
     "rent": 25,
@@ -47,7 +47,7 @@
   },
   {
     "id": 6,
-    "name": "Działka ROD Radość",
+    "name": "Katowice",
     "type": "property",
     "price": 100,
     "rent": 6,
@@ -55,14 +55,14 @@
   },
   {
     "id": 7,
-    "name": "Los Polacos",
+    "name": "Szansa",
     "type": "chance",
     "price": 0,
     "group": "special"
   },
   {
     "id": 8,
-    "name": "Działka ROD Spokój",
+    "name": "Gliwice",
     "type": "property",
     "price": 100,
     "rent": 6,
@@ -70,7 +70,7 @@
   },
   {
     "id": 9,
-    "name": "Działka ROD Relaks",
+    "name": "Zabrze",
     "type": "property",
     "price": 120,
     "rent": 8,
@@ -78,14 +78,14 @@
   },
   {
     "id": 10,
-    "name": "Izba Wytrzeźwień",
+    "name": "Więzienie",
     "type": "jail_visit",
     "price": 0,
     "group": "special"
   },
   {
     "id": 11,
-    "name": "Mielno",
+    "name": "Gdynia",
     "type": "property",
     "price": 140,
     "rent": 10,
@@ -93,7 +93,7 @@
   },
   {
     "id": 12,
-    "name": "Orlen (Parówki)",
+    "name": "Elektrownia",
     "type": "utility",
     "price": 150,
     "rent": 0,
@@ -101,7 +101,7 @@
   },
   {
     "id": 13,
-    "name": "Władysławowo",
+    "name": "Sopot",
     "type": "property",
     "price": 140,
     "rent": 10,
@@ -109,7 +109,7 @@
   },
   {
     "id": 14,
-    "name": "Zakopane",
+    "name": "Gdańsk",
     "type": "property",
     "price": 160,
     "rent": 12,
@@ -117,7 +117,7 @@
   },
   {
     "id": 15,
-    "name": "Passat 1.9 TDI",
+    "name": "Dworzec Zachodni",
     "type": "transport",
     "price": 200,
     "rent": 25,
@@ -125,7 +125,7 @@
   },
   {
     "id": 16,
-    "name": "Bieszczady",
+    "name": "Toruń",
     "type": "property",
     "price": 180,
     "rent": 14,
@@ -133,14 +133,14 @@
   },
   {
     "id": 17,
-    "name": "Los Polacos",
+    "name": "Szansa",
     "type": "chance",
     "price": 0,
     "group": "special"
   },
   {
     "id": 18,
-    "name": "Mazury",
+    "name": "Bydgoszcz",
     "type": "property",
     "price": 180,
     "rent": 14,
@@ -148,7 +148,7 @@
   },
   {
     "id": 19,
-    "name": "Sopot",
+    "name": "Szczecin",
     "type": "property",
     "price": 200,
     "rent": 16,
@@ -156,14 +156,14 @@
   },
   {
     "id": 20,
-    "name": "Darmowy Parking pod Biedrą",
+    "name": "Bezpłatny Parking",
     "type": "parking",
     "price": 0,
     "group": "special"
   },
   {
     "id": 21,
-    "name": "Łódź Bałuty",
+    "name": "Łódź",
     "type": "property",
     "price": 220,
     "rent": 18,
@@ -171,14 +171,14 @@
   },
   {
     "id": 22,
-    "name": "Los Polacos",
+    "name": "Szansa",
     "type": "chance",
     "price": 0,
     "group": "special"
   },
   {
     "id": 23,
-    "name": "Wrocław Trójkąt",
+    "name": "Wrocław",
     "type": "property",
     "price": 220,
     "rent": 18,
@@ -186,7 +186,7 @@
   },
   {
     "id": 24,
-    "name": "Kraków Nowa Huta",
+    "name": "Poznań",
     "type": "property",
     "price": 240,
     "rent": 20,
@@ -194,7 +194,7 @@
   },
   {
     "id": 25,
-    "name": "Hulajnoga Elektryczna",
+    "name": "Dworzec Wschodni",
     "type": "transport",
     "price": 200,
     "rent": 25,
@@ -202,7 +202,7 @@
   },
   {
     "id": 26,
-    "name": "Patodeweloperka 1",
+    "name": "Kraków",
     "type": "property",
     "price": 260,
     "rent": 22,
@@ -210,7 +210,7 @@
   },
   {
     "id": 27,
-    "name": "Mikrokawalerka 9m2",
+    "name": "Zakopane",
     "type": "property",
     "price": 260,
     "rent": 22,
@@ -218,7 +218,7 @@
   },
   {
     "id": 28,
-    "name": "Żabka (Hot Dogi)",
+    "name": "Wodociągi",
     "type": "utility",
     "price": 150,
     "rent": 0,
@@ -226,7 +226,7 @@
   },
   {
     "id": 29,
-    "name": "Dziura w Ziemi",
+    "name": "Wieliczka",
     "type": "property",
     "price": 280,
     "rent": 24,
@@ -234,14 +234,14 @@
   },
   {
     "id": 30,
-    "name": "Bagiety po Ciebie jadą",
+    "name": "Idziesz do Więzienia",
     "type": "gotojail",
     "price": 0,
     "group": "special"
   },
   {
     "id": 31,
-    "name": "Wilanów",
+    "name": "Warszawa Wola",
     "type": "property",
     "price": 300,
     "rent": 26,
@@ -249,7 +249,7 @@
   },
   {
     "id": 32,
-    "name": "Nowogrodzka",
+    "name": "Warszawa Mokotów",
     "type": "property",
     "price": 300,
     "rent": 26,
@@ -257,14 +257,14 @@
   },
   {
     "id": 33,
-    "name": "Los Polacos",
+    "name": "Szansa",
     "type": "chance",
     "price": 0,
     "group": "special"
   },
   {
     "id": 34,
-    "name": "Apartament Złota 44",
+    "name": "Warszawa Centrum",
     "type": "property",
     "price": 320,
     "rent": 28,
@@ -272,7 +272,7 @@
   },
   {
     "id": 35,
-    "name": "Uber / Bolt",
+    "name": "Dworzec Gdański",
     "type": "transport",
     "price": 200,
     "rent": 25,
@@ -280,14 +280,14 @@
   },
   {
     "id": 36,
-    "name": "Los Polacos",
+    "name": "Szansa",
     "type": "chance",
     "price": 0,
     "group": "special"
   },
   {
     "id": 37,
-    "name": "Siedziba TVP",
+    "name": "Warszawa Śródmieście",
     "type": "property",
     "price": 350,
     "rent": 35,
@@ -295,7 +295,7 @@
   },
   {
     "id": 38,
-    "name": "Podatek Cukrowy",
+    "name": "Podatek od Luksusu",
     "type": "tax",
     "price": 0,
     "amount": 100,
@@ -303,7 +303,7 @@
   },
   {
     "id": 39,
-    "name": "Żoliborz",
+    "name": "Warszawa Stare Miasto",
     "type": "property",
     "price": 400,
     "rent": 50,

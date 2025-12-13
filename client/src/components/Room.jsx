@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
 import confetti from 'canvas-confetti';
@@ -12,6 +12,7 @@ const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:
 
 function Room() {
   const { roomId } = useParams();
+  const location = useLocation();
   const [socket, setSocket] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [boardConfig, setBoardConfig] = useState([]);
@@ -28,15 +29,27 @@ function Room() {
   useEffect(() => {
     if (connectedRef.current) return;
 
-    // Check if we need a nick (new player)
     const storedUuid = localStorage.getItem('player_uuid');
-    if (!storedUuid) {
-      setNeedsNick(true);
-      return;
+    const passedNick = location.state?.nick;
+
+    // If we have a passed Nick, use it (even if we have stored UUID, we might want to update it or join as new)
+    // Actually, sticky session means we prefer storedUuid.
+    // However, the user specifically wants to set nickname.
+    // If a nickname is explicitly passed from Home, we should send it to initSocket.
+
+    if (passedNick) {
+       // If no stored UUID, generate one. If stored UUID exists, we use it but update nick.
+       const uuidToUse = storedUuid || uuidv4();
+       initSocket(uuidToUse, passedNick);
+    } else {
+       // Direct link access?
+       if (!storedUuid) {
+         setNeedsNick(true);
+         return;
+       }
+       initSocket(storedUuid);
     }
 
-    // Connect
-    initSocket(storedUuid);
     connectedRef.current = true;
 
     return () => {
@@ -154,7 +167,7 @@ function Room() {
     return (
       <div className="winner-screen">
         <h1>KONIEC GRY!</h1>
-        <h2>KRÓL CEBULI: {gameState.winner.nick}</h2>
+        <h2>ZWYCIĘZCA: {gameState.winner.nick}</h2>
         <p>Gratulacje! Zniszczyłeś konkurencję.</p>
         <button onClick={() => window.location.reload()}>Nowa Gra</button>
       </div>
@@ -225,7 +238,7 @@ function Room() {
       <div className="sidebar">
         <div className="player-stats">
           <h3>Twój portfel</h3>
-          <div className="cash">{me?.cash || 0} CBL</div>
+          <div className="cash">{me?.cash || 0} PLN</div>
           <div className="nick">{me?.nick}</div>
           <button className="btn-tiny trade-btn" onClick={() => setShowTradeModal(true)}>Handel</button>
         </div>
