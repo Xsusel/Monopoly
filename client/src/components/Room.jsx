@@ -21,9 +21,13 @@ function Room() {
   const [nickInput, setNickInput] = useState('');
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [rollingDice, setRollingDice] = useState(null); // { die1, die2 } or null
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [showChat, setShowChat] = useState(false); // Default to logs, toggle to Chat
 
   const connectedRef = useRef(false);
   const logsEndRef = useRef(null);
+  const chatEndRef = useRef(null);
   const lastActionIdRef = useRef(null);
 
   useEffect(() => {
@@ -32,17 +36,10 @@ function Room() {
     const storedUuid = localStorage.getItem('player_uuid');
     const passedNick = location.state?.nick;
 
-    // If we have a passed Nick, use it (even if we have stored UUID, we might want to update it or join as new)
-    // Actually, sticky session means we prefer storedUuid.
-    // However, the user specifically wants to set nickname.
-    // If a nickname is explicitly passed from Home, we should send it to initSocket.
-
     if (passedNick) {
-       // If no stored UUID, generate one. If stored UUID exists, we use it but update nick.
        const uuidToUse = storedUuid || uuidv4();
        initSocket(uuidToUse, passedNick);
     } else {
-       // Direct link access?
        if (!storedUuid) {
          setNeedsNick(true);
          return;
@@ -59,10 +56,17 @@ function Room() {
 
   // Auto-scroll logs
   useEffect(() => {
-    if (logsEndRef.current) {
+    if (logsEndRef.current && !showChat) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [gameState?.logs]);
+  }, [gameState?.logs, showChat]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatEndRef.current && showChat) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, showChat]);
 
   // Handle Animations based on state updates
   useEffect(() => {
@@ -101,11 +105,16 @@ function Room() {
       setMyUuid(data.uuid);
       setGameState(data.roomState);
       setBoardConfig(data.boardConfig);
+      setChatMessages(data.roomState.chat_messages || []);
       setNeedsNick(false);
     });
 
     newSocket.on('room_update', (roomState) => {
       setGameState(roomState);
+    });
+
+    newSocket.on('room_chat_update', (msgs) => {
+      setChatMessages(msgs);
     });
   };
 
@@ -116,6 +125,31 @@ function Room() {
     const newUuid = uuidv4();
     initSocket(newUuid, nickInput.trim());
     connectedRef.current = true;
+  };
+
+  const sendChat = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    socket.emit('chat_message', { roomId, uuid: myUuid, text: chatInput.trim() });
+    setChatInput('');
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    // Simple alert or toast
+    alert('Link skopiowany do schowka!');
+  };
+
+  const kickPlayer = (targetUuid) => {
+    if (window.confirm('Czy na pewno chcesz wyrzucić tego gracza?')) {
+      socket.emit('kick_player', { roomId, uuid: myUuid, targetUuid });
+    }
+  };
+
+  const forceSkip = () => {
+    if (window.confirm('Wymusić koniec tury?')) {
+      socket.emit('force_skip_turn', { roomId, uuid: myUuid });
+    }
   };
 
   if (needsNick) {
@@ -146,11 +180,30 @@ function Room() {
     return (
       <div className="lobby-screen">
         <h1>POCZEKALNIA: {roomId}</h1>
+        <div className="lobby-controls" style={{ marginBottom: '1rem' }}>
+           <button onClick={copyLink} className="btn-tiny">🔗 Skopiuj Link</button>
+        </div>
         <h3>Gracze:</h3>
         <ul>
-          {gameState.turn_order.map(uid => (
-             <li key={uid}>{gameState.players[uid].nick}</li>
-          ))}
+          {gameState.turn_order.map(uid => {
+             const p = gameState.players[uid];
+             return (
+               <li key={uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <span
+                   className={`status-dot ${p.online ? 'online' : 'offline'}`}
+                   title={p.online ? 'Online' : 'Offline'}
+                   style={{
+                     width: '10px', height: '10px', borderRadius: '50%',
+                     backgroundColor: p.online ? '#4caf50' : '#f44336'
+                   }}
+                 ></span>
+                 {p.nick}
+                 {isHost && uid !== myUuid && (
+                   <button className="btn-tiny danger" onClick={() => kickPlayer(uid)} style={{ marginLeft: 'auto' }}>X</button>
+                 )}
+               </li>
+             );
+          })}
         </ul>
         {isHost ? (
            <button className="btn-start" onClick={() => socket.emit('start_game', { roomId, uuid: myUuid })}>
@@ -184,6 +237,7 @@ function Room() {
   }
 
   const isMyTurn = gameState.turn_order[gameState.current_turn_index] === myUuid;
+  const isHost = gameState.turn_order[0] === myUuid;
 
   const handleRoll = () => {
     socket.emit('roll_dice', { roomId, uuid: myUuid });
@@ -237,9 +291,16 @@ function Room() {
 
       <div className="sidebar">
         <div className="player-stats">
-          <h3>Twój portfel</h3>
+          <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             Twój portfel
+             {isHost && <button className="btn-tiny warn" onClick={forceSkip} title="Wymuś koniec tury (AFK)" style={{ fontSize: '10px', padding: '2px 4px' }}>SKIP</button>}
+          </h3>
           <div className="cash">{me?.cash || 0} PLN</div>
-          <div className="nick">{me?.nick}</div>
+          <div className="nick" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+             <span className="status-dot online" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4caf50' }}></span>
+             {me?.nick}
+             <button className="btn-tiny" onClick={copyLink} title="Kopiuj link" style={{ marginLeft: 'auto', fontSize: '12px' }}>🔗</button>
+          </div>
           <button className="btn-tiny trade-btn" onClick={() => setShowTradeModal(true)}>Handel</button>
         </div>
 
@@ -271,11 +332,50 @@ function Room() {
           })}
         </div>
 
-        <div className="logs">
-           {gameState.logs.map((log, i) => (
-             <div key={i} className={`log-entry ${log.type}`}>{log.text}</div>
-           ))}
-           <div ref={logsEndRef} />
+        <div className="sidebar-tabs" style={{ display: 'flex', borderBottom: '1px solid #444', marginBottom: '5px' }}>
+          <button
+             style={{ flex: 1, background: !showChat ? '#444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px' }}
+             onClick={() => setShowChat(false)}
+          >
+             Logi
+          </button>
+          <button
+             style={{ flex: 1, background: showChat ? '#444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px' }}
+             onClick={() => setShowChat(true)}
+          >
+             Czat
+          </button>
+        </div>
+
+        <div className="logs-container" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+           {!showChat ? (
+             <div className="logs" style={{ flex: 1, overflowY: 'auto' }}>
+               {gameState.logs.map((log, i) => (
+                 <div key={i} className={`log-entry ${log.type}`}>{log.text}</div>
+               ))}
+               <div ref={logsEndRef} />
+             </div>
+           ) : (
+             <div className="chat" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+               <div className="chat-messages" style={{ flex: 1, overflowY: 'auto', padding: '5px' }}>
+                 {chatMessages.map((msg, i) => (
+                   <div key={i} className="chat-msg" style={{ marginBottom: '4px', fontSize: '0.9em' }}>
+                     <strong style={{ color: '#aaa' }}>{msg.nick}:</strong> {msg.text}
+                   </div>
+                 ))}
+                 <div ref={chatEndRef} />
+               </div>
+               <form onSubmit={sendChat} className="chat-input" style={{ display: 'flex', padding: '5px' }}>
+                 <input
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    placeholder="..."
+                    style={{ flex: 1, padding: '4px' }}
+                 />
+                 <button type="submit" style={{ padding: '4px 8px' }}>&gt;</button>
+               </form>
+             </div>
+           )}
         </div>
 
         <div className="controls">

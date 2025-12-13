@@ -59,7 +59,8 @@ io.on('connection', (socket) => {
         winner: null,
         status: 'waiting', // waiting | playing
         trades: [], // { id, from: uuid, to: uuid, offer: {cash, properties:[]}, want: {cash, properties:[]} }
-        last_action: null // { type: 'roll', dice: [d1, d2], player: uuid, id: uuid }
+        last_action: null, // { type: 'roll', dice: [d1, d2], player: uuid, id: uuid }
+        chat_messages: [] // { nick, text, time }
       };
       console.log(`Created room ${roomId}`);
     }
@@ -79,6 +80,7 @@ io.on('connection', (socket) => {
         properties: [],
         color: color,
         socketId: socket.id,
+        online: true,
         inJail: false,
         turnsInJail: 0,
         consecutiveDoubles: 0
@@ -89,6 +91,7 @@ io.on('connection', (socket) => {
     } else {
       // Reconnect
       room.players[playerUuid].socketId = socket.id;
+      room.players[playerUuid].online = true;
       if (nick) {
         room.players[playerUuid].nick = nick; // Update nick if provided
       }
@@ -107,6 +110,73 @@ io.on('connection', (socket) => {
 
     // Broadcast update to others
     io.to(roomId).emit('room_update', room);
+  });
+
+  socket.on('disconnect', () => {
+    // Find room and player by socket.id
+    // This is inefficient O(N*M) but fine for small scale
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+      for (const uuid in room.players) {
+        if (room.players[uuid].socketId === socket.id) {
+          room.players[uuid].online = false;
+          io.to(roomId).emit('room_update', room);
+          console.log(`Player ${room.players[uuid].nick} disconnected.`);
+          return; // One socket belongs to one player/room
+        }
+      }
+    }
+  });
+
+  socket.on('chat_message', ({ roomId, uuid, text }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const player = room.players[uuid];
+    if (!player) return;
+
+    const msg = {
+      nick: player.nick,
+      text: text,
+      time: Date.now()
+    };
+    room.chat_messages.push(msg);
+    if (room.chat_messages.length > 50) room.chat_messages.shift(); // Keep last 50
+    io.to(roomId).emit('room_chat_update', room.chat_messages);
+  });
+
+  socket.on('kick_player', ({ roomId, uuid, targetUuid }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    // Only host can kick
+    if (room.turn_order[0] !== uuid) return;
+    // Cannot kick yourself
+    if (uuid === targetUuid) return;
+
+    // Remove player
+    delete room.players[targetUuid];
+    room.turn_order = room.turn_order.filter(id => id !== targetUuid);
+
+    // If playing, adjust turn index
+    if (room.status === 'playing') {
+       if (room.current_turn_index >= room.turn_order.length) {
+         room.current_turn_index = 0;
+       }
+    }
+
+    room.logs.push({ text: `Gracz został wyrzucony z pokoju.`, type: 'warning' });
+    io.to(roomId).emit('room_update', room);
+  });
+
+  socket.on('force_skip_turn', ({ roomId, uuid }) => {
+     const room = rooms[roomId];
+     if (!room) return;
+     // Only host can skip
+     if (room.turn_order[0] !== uuid) return;
+     if (room.status !== 'playing') return;
+
+     room.current_turn_index = (room.current_turn_index + 1) % room.turn_order.length;
+     room.logs.push({ text: `HOST wymusił koniec tury.`, type: 'warning' });
+     io.to(roomId).emit('room_update', room);
   });
 
   socket.on('start_game', ({ roomId, uuid }) => {
