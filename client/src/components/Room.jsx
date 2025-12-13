@@ -117,11 +117,6 @@ function Room() {
     // Turn Start Sound
     if (gameState.turn_order[gameState.current_turn_index] === myUuid) {
         // Only play if it just became my turn.
-        // Simple check: we don't store previous turn index in state easily here without ref.
-        // But this useEffect runs on every gameState update.
-        // Let's rely on log updates or check strict equality with prev state if possible?
-        // Actually, just checking if it is my turn now is "okay" but might spam if other state changes.
-        // We can track prevTurnIndex in ref.
     }
 
     // Winner Confetti
