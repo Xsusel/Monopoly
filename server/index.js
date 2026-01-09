@@ -30,6 +30,14 @@ try {
   console.log("No chance cards found or error loading.");
 }
 
+// Load community chest cards
+let communityChestCards = [];
+try {
+  communityChestCards = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'community_chest.json'), 'utf8'));
+} catch (e) {
+  console.log("No community chest cards found or error loading.");
+}
+
 // In-memory state
 const rooms = {};
 
@@ -43,7 +51,7 @@ const MORTGAGE_INTEREST = 0.1;
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join_room', ({ roomId, nick, uuid }) => {
+  socket.on('join_room', ({ roomId, nick, uuid, avatar }) => {
     // 1. Validate or create UUID
     const playerUuid = uuid || uuidv4();
 
@@ -59,7 +67,10 @@ io.on('connection', (socket) => {
         winner: null,
         status: 'waiting', // waiting | playing
         trades: [], // { id, from: uuid, to: uuid, offer: {cash, properties:[]}, want: {cash, properties:[]} }
-        last_action: null // { type: 'roll', dice: [d1, d2], player: uuid, id: uuid }
+        last_action: null, // { type: 'roll', dice: [d1, d2], player: uuid, id: uuid }
+        chat_messages: [], // { nick, text, time }
+        settings: { turnDuration: 0 }, // 0 = unlimited
+        turnDeadline: null
       };
       console.log(`Created room ${roomId}`);
     }
@@ -74,11 +85,13 @@ io.on('connection', (socket) => {
       room.players[playerUuid] = {
         uuid: playerUuid,
         nick: nick || 'Anon',
+        avatar: avatar || '👤',
         cash: STARTING_CASH,
         pos: 0,
         properties: [],
         color: color,
         socketId: socket.id,
+        online: true,
         inJail: false,
         turnsInJail: 0,
         consecutiveDoubles: 0
@@ -89,6 +102,13 @@ io.on('connection', (socket) => {
     } else {
       // Reconnect
       room.players[playerUuid].socketId = socket.id;
+      room.players[playerUuid].online = true;
+      if (nick) {
+        room.players[playerUuid].nick = nick; // Update nick if provided
+      }
+      if (avatar) {
+        room.players[playerUuid].avatar = avatar; // Update avatar if provided
+      }
       console.log(`Player ${room.players[playerUuid].nick} reconnected.`);
     }
 
@@ -106,15 +126,94 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('room_update', room);
   });
 
-  socket.on('start_game', ({ roomId, uuid }) => {
+  socket.on('disconnect', () => {
+    // Find room and player by socket.id
+    // This is inefficient O(N*M) but fine for small scale
+    for (const roomId in rooms) {
+      const room = rooms[roomId];
+      for (const uuid in room.players) {
+        if (room.players[uuid].socketId === socket.id) {
+          room.players[uuid].online = false;
+          io.to(roomId).emit('room_update', room);
+          console.log(`Player ${room.players[uuid].nick} disconnected.`);
+          return; // One socket belongs to one player/room
+        }
+      }
+    }
+  });
+
+  socket.on('chat_message', ({ roomId, uuid, text }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const player = room.players[uuid];
+    if (!player) return;
+
+    const msg = {
+      nick: player.nick,
+      text: text,
+      time: Date.now()
+    };
+    room.chat_messages.push(msg);
+    if (room.chat_messages.length > 50) room.chat_messages.shift(); // Keep last 50
+    io.to(roomId).emit('room_chat_update', room.chat_messages);
+  });
+
+  socket.on('kick_player', ({ roomId, uuid, targetUuid }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    // Only host can kick
+    if (room.turn_order[0] !== uuid) return;
+    // Cannot kick yourself
+    if (uuid === targetUuid) return;
+
+    // Remove player
+    delete room.players[targetUuid];
+    room.turn_order = room.turn_order.filter(id => id !== targetUuid);
+
+    // If playing, adjust turn index
+    if (room.status === 'playing') {
+       if (room.current_turn_index >= room.turn_order.length) {
+         room.current_turn_index = 0;
+       }
+    }
+
+    room.logs.push({ text: `Gracz został wyrzucony z pokoju.`, type: 'warning' });
+    io.to(roomId).emit('room_update', room);
+  });
+
+  socket.on('force_skip_turn', ({ roomId, uuid }) => {
+     const room = rooms[roomId];
+     if (!room) return;
+     // Only host can skip
+     if (room.turn_order[0] !== uuid) return;
+     if (room.status !== 'playing') return;
+
+     nextTurn(room);
+     room.logs.push({ text: `HOST wymusił koniec tury.`, type: 'warning' });
+     io.to(roomId).emit('room_update', room);
+  });
+
+  socket.on('start_game', ({ roomId, uuid, settings }) => {
     const room = rooms[roomId];
     if (!room) return;
 
     // Only first player (host) can start
     if (room.turn_order[0] !== uuid) return;
 
+    if (settings) {
+       room.settings = settings;
+    }
+
     room.status = 'playing';
-    room.logs.push({ text: `GRA ROZPOCZĘTA!`, type: 'success' });
+    room.current_turn_index = 0;
+
+    if (room.settings.turnDuration > 0) {
+       room.turnDeadline = Date.now() + (room.settings.turnDuration * 1000);
+    } else {
+       room.turnDeadline = null;
+    }
+
+    room.logs.push({ text: `GRA ROZPOCZĘTA! Czas na turę: ${room.settings.turnDuration > 0 ? room.settings.turnDuration + 's' : 'Bez limitu'}.`, type: 'success' });
     io.to(roomId).emit('room_update', room);
   });
 
@@ -143,7 +242,7 @@ io.on('connection', (socket) => {
         player.inJail = false;
         player.turnsInJail = 0;
         player.consecutiveDoubles = 0;
-        room.logs.push({ text: `${player.nick} wyrzuca dublet (${die1}-${die2}) i wychodzi z Izby Wytrzeźwień!`, type: 'success' });
+        room.logs.push({ text: `${player.nick} wyrzuca dublet (${die1}-${die2}) i wychodzi z Więzienia!`, type: 'success' });
         movePlayer(room, player, die1 + die2, die1 + die2);
       } else {
         player.turnsInJail++;
@@ -211,7 +310,7 @@ io.on('connection', (socket) => {
     };
     player.properties.push(fieldId);
 
-    room.logs.push({ text: `${player.nick} kupuje ${field.name} za ${field.price} CBL.`, type: 'success' });
+    room.logs.push({ text: `${player.nick} kupuje ${field.name} za ${field.price} PLN.`, type: 'success' });
 
     io.to(roomId).emit('room_update', room);
   });
@@ -227,7 +326,7 @@ io.on('connection', (socket) => {
     if (player.cash < 0) {
       handleBankruptcy(room, uuid);
     } else {
-      room.current_turn_index = (room.current_turn_index + 1) % room.turn_order.length;
+      nextTurn(room);
     }
 
     io.to(roomId).emit('room_update', room);
@@ -278,7 +377,7 @@ io.on('connection', (socket) => {
     player.cash += mortgageValue;
     prop.mortgaged = true;
 
-    room.logs.push({ text: `${player.nick} zastawia ${field.name} za ${mortgageValue} CBL.`, type: 'warning' });
+    room.logs.push({ text: `${player.nick} zastawia ${field.name} za ${mortgageValue} PLN.`, type: 'warning' });
     io.to(roomId).emit('room_update', room);
   });
 
@@ -300,7 +399,7 @@ io.on('connection', (socket) => {
     player.cash -= cost;
     prop.mortgaged = false;
 
-    room.logs.push({ text: `${player.nick} wykupuje ${field.name} z zastawu za ${cost} CBL.`, type: 'success' });
+    room.logs.push({ text: `${player.nick} wykupuje ${field.name} z zastawu za ${cost} PLN.`, type: 'success' });
     io.to(roomId).emit('room_update', room);
   });
 
@@ -403,7 +502,7 @@ function movePlayer(room, player, steps, diceRoll) {
     if (newPos >= 40) {
       newPos = newPos - 40;
       player.cash += PASS_START_BONUS;
-      room.logs.push({ text: `MOPS wypłacił 500+ (${PASS_START_BONUS} CBL) dla gracza ${player.nick}.`, type: 'success' });
+      room.logs.push({ text: `Przechodzisz przez START. Otrzymujesz ${PASS_START_BONUS} PLN.`, type: 'success' });
     }
 
     player.pos = newPos;
@@ -449,19 +548,19 @@ function handleFieldArrival(room, player, field, diceRoll) {
       if (player.cash >= rent) {
         player.cash -= rent;
         owner.cash += rent;
-        room.logs.push({ text: `${player.nick} płaci ${rent} CBL złodziejowi ${owner.nick}.`, type: 'danger' });
+        room.logs.push({ text: `${player.nick} płaci czynsz ${rent} PLN dla gracza ${owner.nick}.`, type: 'danger' });
       } else {
         const amount = player.cash > 0 ? player.cash : 0;
         player.cash -= rent;
         owner.cash += amount;
-        room.logs.push({ text: `${player.nick} wisi kasę! Płaci co ma (${amount}) i jest na minusie.`, type: 'danger' });
+        room.logs.push({ text: `${player.nick} nie ma środków! Płaci co ma (${amount}) i jest na minusie.`, type: 'danger' });
       }
     }
   }
 
   if (field.type === 'tax') {
     player.cash -= field.amount;
-    room.logs.push({ text: `Nowy Ład! ${player.nick} traci ${field.amount} CBL.`, type: 'danger' });
+    room.logs.push({ text: `Podatek! ${player.nick} traci ${field.amount} PLN.`, type: 'danger' });
   }
 
   if (field.type === 'gotojail') {
@@ -469,7 +568,11 @@ function handleFieldArrival(room, player, field, diceRoll) {
   }
 
   if (field.type === 'chance') {
-    handleChanceCard(room, player);
+    handleChanceCard(room, player, chanceCards, "Szansa");
+  }
+
+  if (field.type === 'community_chest') {
+    handleChanceCard(room, player, communityChestCards, "Skrzynia");
   }
 }
 
@@ -478,14 +581,14 @@ function sendToJail(room, player) {
   player.inJail = true;
   player.turnsInJail = 0;
   player.consecutiveDoubles = 0;
-  room.logs.push({ text: `Bagiety po Ciebie jadą! ${player.nick} ląduje na Izbie Wytrzeźwień.`, type: 'warning' });
+  room.logs.push({ text: `${player.nick} idzie do Więzienia!`, type: 'warning' });
 }
 
-function handleChanceCard(room, player) {
-  if (chanceCards.length === 0) return;
-  const card = chanceCards[Math.floor(Math.random() * chanceCards.length)];
+function handleChanceCard(room, player, deck, deckName) {
+  if (!deck || deck.length === 0) return;
+  const card = deck[Math.floor(Math.random() * deck.length)];
 
-  room.logs.push({ text: `Karta Szansy: ${card.text}`, type: 'special' });
+  room.logs.push({ text: `${deckName}: ${card.text}`, type: 'special' });
 
   switch(card.action) {
     case 'pay':
@@ -512,9 +615,18 @@ function handleChanceCard(room, player) {
   }
 }
 
+function nextTurn(room) {
+  room.current_turn_index = (room.current_turn_index + 1) % room.turn_order.length;
+  if (room.settings.turnDuration > 0) {
+     room.turnDeadline = Date.now() + (room.settings.turnDuration * 1000);
+  } else {
+     room.turnDeadline = null;
+  }
+}
+
 function handleBankruptcy(room, bankruptUuid) {
   const player = room.players[bankruptUuid];
-  room.logs.push({ text: `KOMORNIK ZAJĄŁ MEBLOŚCIANKĘ! ${player.nick} BANKRUTUJE I ODPADA!`, type: 'danger' });
+  room.logs.push({ text: `${player.nick} BANKRUTUJE I ODPADA!`, type: 'danger' });
 
   player.properties.forEach(fieldId => {
     delete room.board_ownership[fieldId];
@@ -526,13 +638,37 @@ function handleBankruptcy(room, bankruptUuid) {
     room.current_turn_index = room.current_turn_index % room.turn_order.length;
   }
 
+  // Check win condition
   if (room.turn_order.length === 1) {
     const winnerUuid = room.turn_order[0];
     const winner = room.players[winnerUuid];
     room.winner = winner;
-    room.logs.push({ text: `MAMY ZWYCIĘZCĘ! KRÓL CEBULI: ${winner.nick}!`, type: 'success' });
+    room.logs.push({ text: `MAMY ZWYCIĘZCĘ: ${winner.nick}!`, type: 'success' });
+    room.status = 'finished';
+  } else {
+     // Reset timer for next player if game continues
+     if (room.settings.turnDuration > 0) {
+        room.turnDeadline = Date.now() + (room.settings.turnDuration * 1000);
+     }
   }
 }
+
+// Global Interval for Game Loop (Timers)
+setInterval(() => {
+  const now = Date.now();
+  for (const roomId in rooms) {
+    const room = rooms[roomId];
+    if (room.status === 'playing' && room.turnDeadline && now > room.turnDeadline) {
+       // Time expired!
+       const currentPlayerUuid = room.turn_order[room.current_turn_index];
+       const player = room.players[currentPlayerUuid];
+
+       room.logs.push({ text: `Czas minął! Tura gracza ${player.nick} przepadła.`, type: 'warning' });
+       nextTurn(room);
+       io.to(roomId).emit('room_update', room);
+    }
+  }
+}, 1000);
 
 app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));

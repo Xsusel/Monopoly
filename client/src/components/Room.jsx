@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
 import confetti from 'canvas-confetti';
@@ -12,6 +12,7 @@ const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:
 
 function Room() {
   const { roomId } = useParams();
+  const location = useLocation();
   const [socket, setSocket] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [boardConfig, setBoardConfig] = useState([]);
@@ -20,23 +21,62 @@ function Room() {
   const [nickInput, setNickInput] = useState('');
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [rollingDice, setRollingDice] = useState(null); // { die1, die2 } or null
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [showChat, setShowChat] = useState(false); // Default to logs, toggle to Chat
+  const [turnDuration, setTurnDuration] = useState(60); // Default 60s
+  const [timeLeft, setTimeLeft] = useState(null);
 
   const connectedRef = useRef(false);
   const logsEndRef = useRef(null);
+  const chatEndRef = useRef(null);
   const lastActionIdRef = useRef(null);
+
+  // Reuse AudioContext
+  const audioCtxRef = useRef(null);
+
+  const playBeep = (freq = 440, type = 'sine', duration = 0.1) => {
+    try {
+      if (!audioCtxRef.current) {
+         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+      osc.stop(ctx.currentTime + duration);
+    } catch (e) {
+      // Audio context might be blocked
+    }
+  };
 
   useEffect(() => {
     if (connectedRef.current) return;
 
-    // Check if we need a nick (new player)
     const storedUuid = localStorage.getItem('player_uuid');
-    if (!storedUuid) {
-      setNeedsNick(true);
-      return;
+    const passedNick = location.state?.nick;
+    const passedAvatar = location.state?.avatar;
+
+    if (passedNick) {
+       const uuidToUse = storedUuid || uuidv4();
+       initSocket(uuidToUse, passedNick, passedAvatar);
+    } else {
+       if (!storedUuid) {
+         setNeedsNick(true);
+         return;
+       }
+       initSocket(storedUuid);
     }
 
-    // Connect
-    initSocket(storedUuid);
     connectedRef.current = true;
 
     return () => {
@@ -46,16 +86,23 @@ function Room() {
 
   // Auto-scroll logs
   useEffect(() => {
-    if (logsEndRef.current) {
+    if (logsEndRef.current && !showChat) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [gameState?.logs]);
+  }, [gameState?.logs, showChat]);
 
-  // Handle Animations based on state updates
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatEndRef.current && showChat) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, showChat]);
+
+  // Handle Animations & Sounds based on state updates
   useEffect(() => {
     if (!gameState) return;
 
-    // Dice Animation
+    // Dice Animation & Sound
     if (gameState.last_action && gameState.last_action.type === 'roll') {
       if (gameState.last_action.id !== lastActionIdRef.current) {
          lastActionIdRef.current = gameState.last_action.id;
@@ -63,7 +110,13 @@ function Room() {
             die1: gameState.last_action.dice[0],
             die2: gameState.last_action.dice[1]
          });
+         playBeep(200, 'square', 0.1); // Roll sound
       }
+    }
+
+    // Turn Start Sound
+    if (gameState.turn_order[gameState.current_turn_index] === myUuid) {
+        // Only play if it just became my turn.
     }
 
     // Winner Confetti
@@ -73,26 +126,82 @@ function Room() {
          spread: 70,
          origin: { y: 0.6 }
       });
+      playBeep(600, 'sine', 0.5); // Win sound
     }
 
   }, [gameState]);
 
-  const initSocket = (uuid, nick = null) => {
+  // Track turn changes for sound
+  const prevTurnRef = useRef(null);
+  useEffect(() => {
+     if (!gameState) return;
+     const currentTurnPlayer = gameState.turn_order[gameState.current_turn_index];
+
+     if (prevTurnRef.current !== currentTurnPlayer) {
+        if (currentTurnPlayer === myUuid) {
+            playBeep(600, 'sine', 0.2); // My Turn!
+            setTimeout(() => playBeep(800, 'sine', 0.4), 200);
+        } else {
+            // Other player turn
+            playBeep(300, 'sine', 0.1);
+        }
+        prevTurnRef.current = currentTurnPlayer;
+     }
+  }, [gameState?.current_turn_index]);
+
+  // Track Cash for sound
+  const prevCashRef = useRef(null);
+  useEffect(() => {
+     if (!me) return;
+     if (prevCashRef.current !== null && me.cash !== prevCashRef.current) {
+         if (me.cash > prevCashRef.current) {
+             // Money gained
+             playBeep(1000, 'triangle', 0.1);
+             setTimeout(() => playBeep(1200, 'triangle', 0.1), 100);
+         } else {
+             // Money spent
+             playBeep(150, 'sawtooth', 0.1);
+         }
+     }
+     prevCashRef.current = me.cash;
+  }, [me?.cash]);
+
+  // Timer Countdown Effect
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'playing' || !gameState.turnDeadline) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((gameState.turnDeadline - Date.now()) / 1000);
+      setTimeLeft(remaining > 0 ? remaining : 0);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState?.turnDeadline, gameState?.status]);
+
+  const initSocket = (uuid, nick = null, avatar = null) => {
     const newSocket = io(SOCKET_URL);
     setSocket(newSocket);
 
-    newSocket.emit('join_room', { roomId, uuid, nick });
+    newSocket.emit('join_room', { roomId, uuid, nick, avatar });
 
     newSocket.on('joined_success', (data) => {
       localStorage.setItem('player_uuid', data.uuid);
       setMyUuid(data.uuid);
       setGameState(data.roomState);
       setBoardConfig(data.boardConfig);
+      setChatMessages(data.roomState.chat_messages || []);
       setNeedsNick(false);
     });
 
     newSocket.on('room_update', (roomState) => {
       setGameState(roomState);
+    });
+
+    newSocket.on('room_chat_update', (msgs) => {
+      setChatMessages(msgs);
     });
   };
 
@@ -103,6 +212,31 @@ function Room() {
     const newUuid = uuidv4();
     initSocket(newUuid, nickInput.trim());
     connectedRef.current = true;
+  };
+
+  const sendChat = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    socket.emit('chat_message', { roomId, uuid: myUuid, text: chatInput.trim() });
+    setChatInput('');
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    // Simple alert or toast
+    alert('Link skopiowany do schowka!');
+  };
+
+  const kickPlayer = (targetUuid) => {
+    if (window.confirm('Czy na pewno chcesz wyrzucić tego gracza?')) {
+      socket.emit('kick_player', { roomId, uuid: myUuid, targetUuid });
+    }
+  };
+
+  const forceSkip = () => {
+    if (window.confirm('Wymusić koniec tury?')) {
+      socket.emit('force_skip_turn', { roomId, uuid: myUuid });
+    }
   };
 
   if (needsNick) {
@@ -133,16 +267,48 @@ function Room() {
     return (
       <div className="lobby-screen">
         <h1>POCZEKALNIA: {roomId}</h1>
+        <div className="lobby-controls" style={{ marginBottom: '1rem' }}>
+           <button onClick={copyLink} className="btn-tiny">🔗 Skopiuj Link</button>
+        </div>
         <h3>Gracze:</h3>
         <ul>
-          {gameState.turn_order.map(uid => (
-             <li key={uid}>{gameState.players[uid].nick}</li>
-          ))}
+          {gameState.turn_order.map(uid => {
+             const p = gameState.players[uid];
+             return (
+               <li key={uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <span
+                   className={`status-dot ${p.online ? 'online' : 'offline'}`}
+                   title={p.online ? 'Online' : 'Offline'}
+                   style={{
+                     width: '10px', height: '10px', borderRadius: '50%',
+                     backgroundColor: p.online ? '#4caf50' : '#f44336'
+                   }}
+                 ></span>
+                 <span style={{ fontSize: '1.2rem' }}>{p.avatar || '👤'}</span> {p.nick}
+                 {isHost && uid !== myUuid && (
+                   <button className="btn-tiny danger" onClick={() => kickPlayer(uid)} style={{ marginLeft: 'auto' }}>X</button>
+                 )}
+               </li>
+             );
+          })}
         </ul>
         {isHost ? (
-           <button className="btn-start" onClick={() => socket.emit('start_game', { roomId, uuid: myUuid })}>
-             START GRY
-           </button>
+           <div className="host-controls">
+             <div className="setting-row">
+                <label>Czas na turę: </label>
+                <select value={turnDuration} onChange={e => setTurnDuration(Number(e.target.value))}>
+                  <option value={0}>Bez limitu</option>
+                  <option value={30}>30 sek</option>
+                  <option value={60}>60 sek</option>
+                  <option value={90}>90 sek</option>
+                  <option value={120}>2 min</option>
+                  <option value={300}>5 min</option>
+                </select>
+             </div>
+             <button className="btn-start" onClick={() => socket.emit('start_game', { roomId, uuid: myUuid, settings: { turnDuration } })}>
+               START GRY
+             </button>
+           </div>
         ) : (
            <p>Czekamy na Hosta...</p>
         )}
@@ -154,7 +320,7 @@ function Room() {
     return (
       <div className="winner-screen">
         <h1>KONIEC GRY!</h1>
-        <h2>KRÓL CEBULI: {gameState.winner.nick}</h2>
+        <h2>ZWYCIĘZCA: {gameState.winner.nick}</h2>
         <p>Gratulacje! Zniszczyłeś konkurencję.</p>
         <button onClick={() => window.location.reload()}>Nowa Gra</button>
       </div>
@@ -171,6 +337,7 @@ function Room() {
   }
 
   const isMyTurn = gameState.turn_order[gameState.current_turn_index] === myUuid;
+  const isHost = gameState.turn_order[0] === myUuid;
 
   const handleRoll = () => {
     socket.emit('roll_dice', { roomId, uuid: myUuid });
@@ -224,9 +391,24 @@ function Room() {
 
       <div className="sidebar">
         <div className="player-stats">
-          <h3>Twój portfel</h3>
-          <div className="cash">{me?.cash || 0} CBL</div>
-          <div className="nick">{me?.nick}</div>
+          <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             Twój portfel
+             {isHost && <button className="btn-tiny warn" onClick={forceSkip} title="Wymuś koniec tury (AFK)" style={{ fontSize: '10px', padding: '2px 4px' }}>SKIP</button>}
+          </h3>
+
+          {timeLeft !== null && (
+            <div className={`turn-timer ${timeLeft <= 10 ? 'danger' : ''}`} style={{ fontSize: '1.2rem', fontWeight: 'bold', color: timeLeft <= 10 ? 'red' : 'white', marginBottom: '10px' }}>
+               ⏳ {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </div>
+          )}
+
+          <div className="cash">{me?.cash || 0} PLN</div>
+          <div className="nick" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+             <span className="status-dot online" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4caf50' }}></span>
+             <span style={{ fontSize: '1.2rem' }}>{me?.avatar || '👤'}</span>
+             {me?.nick}
+             <button className="btn-tiny" onClick={copyLink} title="Kopiuj link" style={{ marginLeft: 'auto', fontSize: '12px' }}>🔗</button>
+          </div>
           <button className="btn-tiny trade-btn" onClick={() => setShowTradeModal(true)}>Handel</button>
         </div>
 
@@ -258,11 +440,50 @@ function Room() {
           })}
         </div>
 
-        <div className="logs">
-           {gameState.logs.map((log, i) => (
-             <div key={i} className={`log-entry ${log.type}`}>{log.text}</div>
-           ))}
-           <div ref={logsEndRef} />
+        <div className="sidebar-tabs" style={{ display: 'flex', borderBottom: '1px solid #444', marginBottom: '5px' }}>
+          <button
+             style={{ flex: 1, background: !showChat ? '#444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px' }}
+             onClick={() => setShowChat(false)}
+          >
+             Logi
+          </button>
+          <button
+             style={{ flex: 1, background: showChat ? '#444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px' }}
+             onClick={() => setShowChat(true)}
+          >
+             Czat
+          </button>
+        </div>
+
+        <div className="logs-container" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+           {!showChat ? (
+             <div className="logs" style={{ flex: 1, overflowY: 'auto' }}>
+               {gameState.logs.map((log, i) => (
+                 <div key={i} className={`log-entry ${log.type}`}>{log.text}</div>
+               ))}
+               <div ref={logsEndRef} />
+             </div>
+           ) : (
+             <div className="chat" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+               <div className="chat-messages" style={{ flex: 1, overflowY: 'auto', padding: '5px' }}>
+                 {chatMessages.map((msg, i) => (
+                   <div key={i} className="chat-msg" style={{ marginBottom: '4px', fontSize: '0.9em' }}>
+                     <strong style={{ color: '#aaa' }}>{msg.nick}:</strong> {msg.text}
+                   </div>
+                 ))}
+                 <div ref={chatEndRef} />
+               </div>
+               <form onSubmit={sendChat} className="chat-input" style={{ display: 'flex', padding: '5px' }}>
+                 <input
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    placeholder="..."
+                    style={{ flex: 1, padding: '4px' }}
+                 />
+                 <button type="submit" style={{ padding: '4px 8px' }}>&gt;</button>
+               </form>
+             </div>
+           )}
         </div>
 
         <div className="controls">
@@ -289,6 +510,7 @@ function Room() {
           config={boardConfig}
           players={Object.values(gameState.players)}
           ownership={gameState.board_ownership}
+          currentPlayerId={gameState.turn_order[gameState.current_turn_index]}
         />
       </div>
 

@@ -7,12 +7,13 @@
   align-items: center;
   z-index: 2000;
   pointer-events: none;
+  backdrop-filter: blur(2px);
 }
 
 .dice-container {
   display: flex;
-  gap: 50px;
-  perspective: 1000px;
+  gap: 60px;
+  perspective: 1200px;
 }
 
 .die {
@@ -20,34 +21,35 @@
   height: 100px;
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 1s ease-out;
+  transition: transform 1.5s cubic-bezier(0.1, 0.9, 0.2, 1.05); /* Realistic ease-out */
 }
 
 .side {
   position: absolute;
   width: 100%;
   height: 100%;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 16px;
+  box-shadow: inset 0 0 15px rgba(0,0,0,0.1), 0 0 2px rgba(0,0,0,0.2);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  padding: 10px;
+  padding: 12px;
   box-sizing: border-box;
 }
 
 .dot {
-  width: 18px;
-  height: 18px;
-  background: black;
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 30% 30%, #444, #000);
   border-radius: 50%;
   align-self: center;
   justify-self: center;
+  box-shadow: 0 1px 1px rgba(255,255,255,0.8);
 }
 
-/* Positioning Sides */
+/* Positioning Sides (TranslateZ is half of width = 50px) */
 .one { transform: translateZ(50px); }
 .six { transform: rotateY(180deg) translateZ(50px); }
 .two { transform: rotateY(-90deg) translateZ(50px); }
@@ -67,21 +69,32 @@
 
 /* Animation States */
 .rolling {
-  animation: spin 0.5s infinite linear;
+  animation: tumble 0.6s infinite linear;
 }
 
 .rolling-2 {
-  animation: spin 0.6s infinite linear reverse;
+  animation: tumble-reverse 0.7s infinite linear;
 }
 
-@keyframes spin {
+@keyframes tumble {
   0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
-  100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg); }
+  25% { transform: rotateX(90deg) rotateY(90deg) rotateZ(45deg); }
+  50% { transform: rotateX(180deg) rotateY(180deg) rotateZ(90deg); }
+  75% { transform: rotateX(270deg) rotateY(270deg) rotateZ(135deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(180deg); }
 }
 
-.show-1 { transform: rotateX(0deg) rotateY(0deg); }
-.show-6 { transform: rotateX(180deg) rotateY(0deg); }
-.show-2 { transform: rotateX(0deg) rotateY(90deg); }
-.show-5 { transform: rotateX(0deg) rotateY(-90deg); }
-.show-3 { transform: rotateX(90deg) rotateY(0deg); }
-.show-4 { transform: rotateX(-90deg) rotateY(0deg); }
+@keyframes tumble-reverse {
+  0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
+  100% { transform: rotateX(-360deg) rotateY(-360deg) rotateZ(-360deg); }
+}
+
+/* Target Rotations
+   Note: To make it look like it spun many times, we add 720deg or 1080deg to the base rotations
+*/
+.show-1 { transform: rotateX(720deg) rotateY(720deg); }
+.show-6 { transform: rotateX(900deg) rotateY(720deg); } /* 180 + 720 */
+.show-2 { transform: rotateX(720deg) rotateY(810deg); } /* 90 + 720 */
+.show-5 { transform: rotateX(720deg) rotateY(630deg); } /* -90 + 720 */
+.show-3 { transform: rotateX(810deg) rotateY(720deg); } /* 90 + 720 */
+.show-4 { transform: rotateX(630deg) rotateY(720deg); } /* -90 + 720 */
